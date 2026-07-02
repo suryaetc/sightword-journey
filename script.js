@@ -57,7 +57,107 @@
       { w: "think",  p: ["th", "ink"],   s: "I think it is fun." },
       { w: "walk",   p: ["w", "alk"],    s: "We walk to school." },
       { w: "were",   p: ["w", "ere"],    s: "They were happy." },
-      { w: "when",   p: ["wh", "en"],    s: "When is your party?" }
+      { w: "when",   p: ["wh", "en"],    s: "When is your party?" },
+
+      /* --- Added from Std 1 curriculum list --- */
+      /* Math / concept words */
+      { w: "add",      p: ["a", "dd"],        s: "Add two and three." },
+      { w: "match",    p: ["m", "atch"],      s: "Match the socks." },
+      { w: "less",     p: ["l", "ess"],       s: "Five is less than ten." },
+      { w: "digit",    p: ["dig", "it"],      s: "Nine is a digit." },
+      { w: "object",   p: ["ob", "ject"],     s: "A ball is an object." },
+      { w: "number",   p: ["num", "ber"],     s: "Pick a number." },
+      { w: "plus",     p: ["pl", "us"],       s: "Two plus two is four." },
+      { w: "subtract", p: ["sub", "tract"],   s: "Subtract one from five." },
+      { w: "place",    p: ["pl", "ace"],      s: "Put it in its place." },
+      { w: "value",    p: ["val", "ue"],      s: "The value is ten." },
+      { w: "zero",     p: ["ze", "ro"],       s: "Ten has a zero." },
+      { w: "than",     p: ["th", "an"],       s: "Six is more than two." },
+      { w: "sort",     p: ["s", "ort"],       s: "Sort the blocks." },
+      { w: "compare",  p: ["com", "pare"],    s: "Compare the two." },
+      { w: "similar",  p: ["sim", "i", "lar"],s: "These look similar." },
+      { w: "before",   p: ["be", "fore"],     s: "Wash before you eat." },
+      { w: "near",     p: ["n", "ear"],       s: "Sit near me." },
+      { w: "equal",    p: ["e", "qual"],      s: "Two and two are equal." },
+      { w: "different",p: ["dif","fer","ent"],s: "We are all different." },
+      { w: "alike",    p: ["a", "like"],      s: "The twins look alike." },
+      { w: "input",    p: ["in", "put"],      s: "This is the input." },
+      { w: "output",   p: ["out", "put"],     s: "Check the output." },
+      { w: "rule",     p: ["r", "ule"],       s: "Follow the rule." },
+      { w: "use",      p: ["u", "se"],        s: "Use a pencil." },
+
+      /* Short vowel / basic words */
+      { w: "am",       p: ["am"],             s: "I am happy." },
+      { w: "and",      p: ["a", "nd"],        s: "You and me." },
+      { w: "at",       p: ["at"],             s: "Look at the sky." },
+      { w: "can",      p: ["c", "an"],        s: "I can run fast." },
+      { w: "get",      p: ["g", "et"],        s: "Get your coat." },
+      { w: "did",      p: ["d", "id"],        s: "I did my work." },
+      { w: "in",       p: ["in"],             s: "The cat is in the box." },
+      { w: "if",       p: ["if"],             s: "Smile if you are glad." },
+      { w: "is",       p: ["is"],             s: "The sky is blue." },
+      { w: "it",       p: ["it"],             s: "It is a dog." },
+      { w: "its",      p: ["it", "s"],        s: "The dog wags its tail." },
+      { w: "will",     p: ["w", "ill"],       s: "I will help you." },
+      { w: "not",      p: ["n", "ot"],        s: "Do not run." },
+      { w: "on",       p: ["on"],             s: "Sit on the mat." },
+      { w: "but",      p: ["b", "ut"],        s: "Small but strong." },
+      { w: "up",       p: ["up"],             s: "Look up high." },
+      { w: "make",     p: ["m", "ake"],       s: "Make a card." },
+      { w: "made",     p: ["m", "ade"],       s: "I made lunch." },
+      { w: "way",      p: ["w", "ay"],        s: "This way, please." },
+      { w: "day",      p: ["d", "ay"],        s: "Have a nice day." },
+
+      /* Long E */
+      { w: "be",       p: ["be"],             s: "Be kind." },
+      { w: "he",       p: ["he"],             s: "He is my friend." },
+      { w: "she",      p: ["sh", "e"],        s: "She can sing." },
+      { w: "we",       p: ["we"],             s: "We are a team." },
+      { w: "see",      p: ["s", "ee"],        s: "I see the moon." },
+      { w: "these",    p: ["th", "ese"],      s: "These are mine." },
+      { w: "people",   p: ["peo", "ple"],     s: "Kind people help." },
+
+      /* Long I */
+      { w: "i",        p: ["i"],              s: "I like to read." },
+      { w: "my",       p: ["m", "y"],         s: "This is my book." },
+      { w: "like",     p: ["l", "ike"],       s: "I like apples." },
+      { w: "time",     p: ["t", "ime"],       s: "It is time to go." },
+
+      /* Long O */
+      { w: "no",       p: ["n", "o"],         s: "There is no milk." },
+      { w: "go",       p: ["g", "o"],         s: "Let's go home." },
+      { w: "so",       p: ["s", "o"],         s: "I am so happy." },
+
+      /* Long U */
+      { w: "you",      p: ["y", "ou"],        s: "Thank you!" },
+      { w: "your",     p: ["y", "our"],       s: "Is this your hat?" },
+
+      /* TH words */
+      { w: "the",      p: ["th", "e"],        s: "The sun is up." },
+      { w: "this",     p: ["th", "is"],       s: "This is fun." },
+      { w: "that",     p: ["th", "at"],       s: "That is mine." },
+      { w: "there",    p: ["th", "ere"],      s: "Sit over there." },
+      { w: "their",    p: ["th", "eir"],      s: "It is their turn." },
+
+      /* WH words */
+      { w: "what",     p: ["wh", "at"],       s: "What is that?" },
+      { w: "which",    p: ["wh", "ich"],      s: "Which one is red?" },
+      { w: "who",      p: ["wh", "o"],        s: "Who is there?" },
+
+      /* OU / OW + OR/AR sounds */
+      { w: "out",      p: ["ou", "t"],        s: "Let's go out." },
+      { w: "would",    p: ["w", "ould"],      s: "Would you like tea?" },
+      { w: "for",      p: ["f", "or"],        s: "This is for you." },
+      { w: "more",     p: ["m", "ore"],       s: "I want more." },
+      { w: "or",       p: ["or"],             s: "Tea or milk?" },
+      { w: "part",     p: ["p", "art"],       s: "Do your part." },
+
+      /* Irregular words */
+      { w: "said",     p: ["s", "aid"],       s: "She said hello." },
+      { w: "one",      p: ["o", "ne"],        s: "I have one dog." },
+      { w: "two",      p: ["tw", "o"],        s: "I see two cats." },
+      { w: "was",      p: ["w", "as"],        s: "It was fun." },
+      { w: "have",     p: ["h", "ave"],       s: "I have a pet." }
     ],
     2: [
       { w: "always", p: ["al", "ways"],  s: "I always say please." },
