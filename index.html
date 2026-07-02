@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  SightWord Journey — a friendly sight-words learning app
+  ============================================================
+  HOW TO RUN:
+    Just open index.html in any modern browser (Chrome, Safari,
+    Edge, Firefox). No build step, no server, no dependencies.
+    For offline use + Web Speech to work best, you may serve it
+    with a tiny static server, e.g.:
+        python3 -m http.server 8000
+    then visit http://localhost:8000
+
+  FILES:
+    index.html   — structure (this file)
+    style.css    — muted, child-friendly styling + themes
+    script.js    — word data, speech, phonics, navigation, progress
+    sw.js        — service worker for offline caching (optional)
+  ============================================================
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#a7c4a0" />
+  <meta name="description" content="A friendly app for children to learn sight words with sound and phonics." />
+  <title>SightWord Journey</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Skip link for keyboard/screen-reader users -->
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <!-- ===================== TOP BAR ===================== -->
+  <header class="topbar">
+    <button class="home-btn" id="homeBtn" aria-label="Go to home screen" hidden>
+      <span aria-hidden="true">←</span> Home
+    </button>
+
+    <h1 class="brand">
+      <span class="brand-star" aria-hidden="true">★</span>
+      SightWord Journey
+    </h1>
+
+    <button class="theme-btn" id="themeBtn" aria-label="Switch between light and dark mode">
+      <span class="theme-icon" aria-hidden="true">🌙</span>
+    </button>
+  </header>
+
+  <main id="main">
+    <!-- ===================== HOME SCREEN ===================== -->
+    <section id="homeScreen" class="screen active" aria-labelledby="homeHeading">
+      <h2 id="homeHeading" class="screen-title">Pick your level</h2>
+      <p class="screen-subtitle">Tap a card to start learning!</p>
+
+      <div class="grade-grid" role="list">
+        <button class="grade-card grade-1" data-grade="1" role="listitem">
+          <span class="grade-emoji" aria-hidden="true">🌱</span>
+          <span class="grade-name">Std 1</span>
+          <span class="grade-count" data-count="1"></span>
+        </button>
+        <button class="grade-card grade-2" data-grade="2" role="listitem">
+          <span class="grade-emoji" aria-hidden="true">🌻</span>
+          <span class="grade-name">Std 2</span>
+          <span class="grade-count" data-count="2"></span>
+        </button>
+        <button class="grade-card grade-3" data-grade="3" role="listitem">
+          <span class="grade-emoji" aria-hidden="true">🌳</span>
+          <span class="grade-name">Std 3</span>
+          <span class="grade-count" data-count="3"></span>
+        </button>
+        <button class="grade-card grade-4" data-grade="4" role="listitem">
+          <span class="grade-emoji" aria-hidden="true">🦋</span>
+          <span class="grade-name">Std 4</span>
+          <span class="grade-count" data-count="4"></span>
+        </button>
+      </div>
+
+      <div class="mode-row">
+        <button class="mode-btn mode-mix" data-grade="all">
+          <span aria-hidden="true">🌈</span> Mix All Grades
+        </button>
+        <button class="mode-btn mode-random" data-grade="all" data-shuffle="true">
+          <span aria-hidden="true">🎲</span> Random Practice
+        </button>
+      </div>
+
+      <p class="overall-progress" id="overallProgress" aria-live="polite"></p>
+    </section>
+
+    <!-- ===================== LEARNING SCREEN ===================== -->
+    <section id="learnScreen" class="screen" aria-labelledby="learnHeading" hidden>
+      <h2 id="learnHeading" class="visually-hidden">Learning words</h2>
+
+      <!-- Progress -->
+      <div class="progress-wrap">
+        <div class="progress-info">
+          <span class="progress-label" id="progressLabel">Word 1 of 1</span>
+          <span class="progress-level" id="progressLevel"></span>
+        </div>
+        <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progressBarEl">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+      </div>
+
+      <!-- The word card -->
+      <div class="word-stage">
+        <div class="word-card" id="wordCard">
+          <div class="mastery-stars" id="masteryStars" aria-label="Mastery for this word"></div>
+          <div class="word-display" id="wordDisplay" aria-live="polite">the</div>
+          <div class="phonics-parts" id="phonicsParts" aria-hidden="true"></div>
+          <p class="word-sentence" id="wordSentence"></p>
+        </div>
+      </div>
+
+      <!-- Sound controls -->
+      <div class="sound-row">
+        <button class="btn btn-listen" id="listenBtn">
+          <span class="btn-icon" aria-hidden="true">🔊</span> Listen
+        </button>
+        <button class="btn btn-slow" id="slowBtn">
+          <span class="btn-icon" aria-hidden="true">🐢</span> Slow
+        </button>
+        <button class="btn btn-phonics" id="phonicsBtn">
+          <span class="btn-icon" aria-hidden="true">🔤</span> Sound It Out
+        </button>
+      </div>
+
+      <!-- Know-it -->
+      <button class="btn btn-know" id="knowBtn">
+        <span class="btn-icon" aria-hidden="true">⭐</span> I Know This!
+      </button>
+
+      <!-- Navigation -->
+      <div class="nav-row">
+        <button class="btn btn-nav btn-prev" id="prevBtn" aria-label="Previous word">
+          <span aria-hidden="true">◀</span> Back
+        </button>
+        <button class="btn btn-nav btn-repeat" id="repeatBtn" aria-label="Repeat this word">
+          <span aria-hidden="true">🔁</span>
+        </button>
+        <button class="btn btn-nav btn-next" id="nextBtn" aria-label="Next word">
+          Next <span aria-hidden="true">▶</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ===================== FINISH SCREEN ===================== -->
+    <section id="finishScreen" class="screen" aria-labelledby="finishHeading" hidden>
+      <div class="finish-card">
+        <div class="finish-emoji" aria-hidden="true">🎉</div>
+        <h2 id="finishHeading" class="screen-title">Great job!</h2>
+        <p class="finish-text" id="finishText">You finished the whole set!</p>
+        <div class="finish-actions">
+          <button class="btn btn-know" id="againBtn">
+            <span aria-hidden="true">🔁</span> Practice Again
+          </button>
+          <button class="btn btn-nav" id="finishHomeBtn">
+            <span aria-hidden="true">🏠</span> Home
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Confetti canvas overlay -->
+  <canvas id="confettiCanvas" class="confetti-canvas" aria-hidden="true"></canvas>
+
+  <!-- Polite live region for announcements -->
+  <div class="visually-hidden" aria-live="assertive" id="liveRegion"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>

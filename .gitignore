@@ -1,0 +1,10 @@
+# Local Claude Code / preview tooling (not part of the site)
+.claude/
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
