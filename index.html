@@ -88,6 +88,23 @@
       <p class="overall-progress" id="overallProgress" aria-live="polite"></p>
     </section>
 
+    <!-- ===================== SECTION SCREEN ===================== -->
+    <section id="sectionScreen" class="screen" aria-labelledby="sectionHeading" hidden>
+      <h2 id="sectionHeading" class="screen-title">Pick a section</h2>
+      <p id="sectionSubtitle" class="screen-subtitle">Choose a group of words to practice.</p>
+
+      <div class="section-tools">
+        <button class="mode-btn mode-random" id="sectionShuffleBtn">
+          <span aria-hidden="true">🎲</span> Shuffle All
+        </button>
+        <button class="mode-btn mode-mix" id="sectionAllBtn">
+          <span aria-hidden="true">📚</span> All Words (in order)
+        </button>
+      </div>
+
+      <div class="section-grid" id="sectionGrid" role="list"></div>
+    </section>
+
     <!-- ===================== LEARNING SCREEN ===================== -->
     <section id="learnScreen" class="screen" aria-labelledby="learnHeading" hidden>
       <h2 id="learnHeading" class="visually-hidden">Learning words</h2>

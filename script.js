@@ -342,9 +342,16 @@
   const $ = function (sel) { return document.querySelector(sel); };
 
   const homeScreen   = $("#homeScreen");
+  const sectionScreen= $("#sectionScreen");
   const learnScreen  = $("#learnScreen");
   const finishScreen = $("#finishScreen");
-  const screens      = [homeScreen, learnScreen, finishScreen];
+  const screens      = [homeScreen, sectionScreen, learnScreen, finishScreen];
+
+  const sectionHeading  = $("#sectionHeading");
+  const sectionSubtitle = $("#sectionSubtitle");
+  const sectionGrid     = $("#sectionGrid");
+  const sectionShuffleBtn = $("#sectionShuffleBtn");
+  const sectionAllBtn     = $("#sectionAllBtn");
 
   const homeBtn      = $("#homeBtn");
   const themeBtn     = $("#themeBtn");
@@ -401,24 +408,67 @@
     return a;
   }
 
-  function startSession(grade, doShuffle) {
+  // Words of a grade, sorted alphabetically (used for sections).
+  function sortedGrade(grade) {
+    return WORDS[grade].slice().sort(function (a, b) {
+      return a.w.localeCompare(b.w);
+    });
+  }
+
+  // All words across grades (grade order preserved).
+  function allWords() {
     let list = [];
-    let label = "";
+    Object.keys(WORDS).forEach(function (g) { list = list.concat(WORDS[g]); });
+    return list;
+  }
 
-    if (grade === "all") {
-      Object.keys(WORDS).forEach(function (g) { list = list.concat(WORDS[g]); });
-      label = doShuffle ? "Random Practice" : "Mix All Grades";
-    } else {
-      list = WORDS[grade].slice();
-      label = "Std " + grade;
+  // Split a grade's sorted words into fixed-size alphabetical sections.
+  const SECTION_SIZE = 12;
+  function buildSections(grade) {
+    const words = sortedGrade(grade);
+    const sections = [];
+    for (let i = 0; i < words.length; i += SECTION_SIZE) {
+      sections.push(words.slice(i, i + SECTION_SIZE));
     }
+    return sections;
+  }
 
-    if (doShuffle) list = shuffle(list);
+  // The grade the section screen is currently showing.
+  let currentGrade = null;
 
+  // Open the section-picker screen for a grade.
+  function openGrade(grade) {
+    currentGrade = grade;
+    const words = sortedGrade(grade);
+    sectionHeading.textContent = "Std " + grade;
+    sectionSubtitle.textContent =
+      "Pick a section, or practice all " + words.length + " words.";
+
+    sectionGrid.innerHTML = "";
+    buildSections(grade).forEach(function (sec, i) {
+      const first = sec[0].w;
+      const last = sec[sec.length - 1].w;
+      const btn = document.createElement("button");
+      btn.className = "section-card";
+      btn.setAttribute("role", "listitem");
+      btn.innerHTML =
+        '<span class="section-num">Section ' + (i + 1) + "</span>" +
+        '<span class="section-range">' + first + " – " + last + "</span>" +
+        '<span class="section-meta">' + sec.length + " words</span>";
+      btn.addEventListener("click", function () {
+        beginSession(sec, "Std " + grade + " · " + first + "–" + last);
+      });
+      sectionGrid.appendChild(btn);
+    });
+
+    showScreen(sectionScreen);
+  }
+
+  // Start a learning session from a prepared list of words.
+  function beginSession(list, label) {
     state.list = list;
     state.index = 0;
     state.levelLabel = label;
-
     showScreen(learnScreen);
     renderWord();
   }
@@ -464,11 +514,10 @@
     // Enable/disable prev
     prevBtn.disabled = state.index === 0;
 
-    // Announce for screen readers
+    // Announce for screen readers (silent text label, not audio)
     announce(item.w);
-
-    // Auto-say the word gently on arrival
-    speakWord(item.w, false);
+    // Note: the word is NOT spoken automatically. It plays only when the
+    // child presses Listen, Slow, Repeat, or Sound It Out.
   }
 
   function renderSentence(item) {
@@ -585,7 +634,7 @@
     if (!synth) { warnNoSpeech(); return; }
 
     synth.cancel();
-    // Reveal phonics row
+    // Reveal the phonics row so children can see the parts.
     phonicsParts.classList.add("show");
     phonicsParts.setAttribute("aria-hidden", "false");
     clearHighlights();
@@ -593,53 +642,45 @@
     const spans = Array.prototype.slice.call(
       phonicsParts.querySelectorAll(".phonics-part")
     );
-    const partsText = (item.p && item.p.length) ? item.p : [item.w];
 
     phonicsBtn.classList.add("speaking");
 
-    let i = 0;
-    function speakPart() {
-      if (i >= partsText.length) {
-        // Finally, say the whole word smoothly
-        clearHighlights();
-        const whole = new SpeechSynthesisUtterance(item.w);
-        const v = pickVoice();
-        if (v) { whole.voice = v; whole.lang = v.lang; }
-        whole.rate = NORMAL_RATE;
-        whole.pitch = 1.15;
-        whole.onend = whole.onerror = function () {
-          phonicsBtn.classList.remove("speaking");
-        };
-        // highlight the whole word by lighting all parts briefly
-        spans.forEach(function (s) { s.classList.add("active"); });
-        whole.onend = function () {
-          spans.forEach(function (s) { s.classList.remove("active"); });
-          phonicsBtn.classList.remove("speaking");
-        };
-        synth.speak(whole);
-        return;
-      }
+    // IMPORTANT: We speak the WHOLE word slowly rather than each part.
+    // Speech synthesis reads isolated letters/chunks (e.g. "a", "ny", "th")
+    // as letter NAMES ("ay", "en-why"), which sounds like spelling and
+    // confuses young readers. Saying the whole word slowly gives a correct
+    // pronunciation, while we sweep the highlight across the parts so kids
+    // can follow along visually with the sounds.
+    const u = new SpeechSynthesisUtterance(item.w);
+    const v = pickVoice();
+    if (v) { u.voice = v; u.lang = v.lang; }
+    u.rate = 0.5;        // extra slow for sounding out
+    u.pitch = 1.15;
 
+    // Sweep the highlight through the parts while the word is spoken.
+    let idx = 0;
+    clearHighlights();
+    if (spans[0]) spans[0].classList.add("active");
+    const dwell = spans.length > 1 ? 560 : 700; // ms per part
+    const sweep = setInterval(function () {
+      idx++;
       clearHighlights();
-      if (spans[i]) spans[i].classList.add("active");
+      if (idx < spans.length && spans[idx]) {
+        spans[idx].classList.add("active");
+      } else {
+        clearInterval(sweep); // reached the last part; hold it lit
+        if (spans.length) spans[spans.length - 1].classList.add("active");
+      }
+    }, dwell);
 
-      const u = new SpeechSynthesisUtterance(partsText[i]);
-      const v = pickVoice();
-      if (v) { u.voice = v; u.lang = v.lang; }
-      u.rate = SLOW_RATE;      // always slow for sounding out
-      u.pitch = 1.15;
-      u.onend = function () {
-        i++;
-        // small pause between parts so kids can follow
-        setTimeout(speakPart, 260);
-      };
-      u.onerror = function () {
-        i++;
-        setTimeout(speakPart, 260);
-      };
-      synth.speak(u);
-    }
-    speakPart();
+    u.onend = u.onerror = function () {
+      clearInterval(sweep);
+      // Briefly light every part together, then fade out.
+      spans.forEach(function (s) { s.classList.add("active"); });
+      setTimeout(clearHighlights, 450);
+      phonicsBtn.classList.remove("speaking");
+    };
+    synth.speak(u);
   }
 
   let warnedNoSpeech = false;
@@ -812,13 +853,30 @@
   /* ==========================================================
      14. Event wiring
      ========================================================== */
-  // Home grade cards + mode buttons
-  document.querySelectorAll("[data-grade]").forEach(function (btn) {
+  // Home grade cards -> open the section picker for that grade.
+  document.querySelectorAll(".grade-card[data-grade]").forEach(function (btn) {
     btn.addEventListener("click", function () {
-      const grade = btn.getAttribute("data-grade");
-      const doShuffle = btn.getAttribute("data-shuffle") === "true";
-      startSession(grade === "all" ? "all" : Number(grade), doShuffle);
+      openGrade(Number(btn.getAttribute("data-grade")));
     });
+  });
+
+  // Home mode buttons (all grades): Mix All / Random Practice.
+  document.querySelectorAll(".mode-btn[data-grade='all']").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      const doShuffle = btn.getAttribute("data-shuffle") === "true";
+      const list = doShuffle ? shuffle(allWords()) : allWords();
+      beginSession(list, doShuffle ? "Random Practice" : "Mix All Grades");
+    });
+  });
+
+  // Section screen: Shuffle All / All Words for the chosen grade.
+  sectionShuffleBtn.addEventListener("click", function () {
+    if (currentGrade == null) return;
+    beginSession(shuffle(sortedGrade(currentGrade)), "Std " + currentGrade + " · Random");
+  });
+  sectionAllBtn.addEventListener("click", function () {
+    if (currentGrade == null) return;
+    beginSession(sortedGrade(currentGrade), "Std " + currentGrade + " · All");
   });
 
   // Word counts on cards

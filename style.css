@@ -243,6 +243,43 @@ main {
   min-height: 1.2em;
 }
 
+/* ---------- Section picker ---------- */
+.section-tools {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.section-tools .mode-btn { flex: 1 1 auto; min-width: 150px; max-width: 260px; }
+
+.section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.section-card {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 18px 14px;
+  box-shadow: var(--card-shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 5px solid var(--sage);
+  transition: transform 0.15s ease;
+}
+.section-card:hover { transform: translateY(-3px); }
+.section-card:active { transform: scale(0.96); }
+.section-num { font-size: 0.8rem; font-weight: 700; color: var(--sage-deep); text-transform: uppercase; letter-spacing: 0.5px; }
+.section-range { font-size: 1.15rem; font-weight: 800; word-break: break-word; }
+.section-meta { font-size: 0.8rem; color: var(--ink-soft); }
+
 /* ---------- Learning: progress ---------- */
 .progress-wrap { margin: 6px 0 18px; }
 .progress-info {
