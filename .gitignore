@@ -8,3 +8,12 @@ Thumbs.db
 # Editor
 .vscode/
 .idea/
+
+# Python (audio generator)
+__pycache__/
+
+# Google Cloud service-account keys — NEVER commit these
+*-key.json
+*service-account*.json
+gcp*.json
+credentials*.json

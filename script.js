@@ -661,6 +661,89 @@
   const synth = window.speechSynthesis;
   let voices = [];
 
+  /* ----------------------------------------------------------
+     Pre-generated audio clips (Google WaveNet / Chirp voice).
+     A build step creates one MP3 per word / sentence / question
+     and an audio/manifest.json mapping the exact text -> file.
+     At runtime we play the MP3 when present, and fall back to
+     the device's Web Speech voice when it isn't (so the app keeps
+     working before the clips are generated, and offline for any
+     text without a clip).
+     ---------------------------------------------------------- */
+  let clipManifest = {};
+  (function loadClipManifest() {
+    try {
+      fetch("audio/manifest.json", { cache: "no-cache" })
+        .then(function (r) { return r.ok ? r.json() : {}; })
+        .then(function (j) { clipManifest = j || {}; })
+        .catch(function () { /* no clips yet — use Web Speech */ });
+    } catch (e) { /* ignore */ }
+  })();
+
+  function clipUrlFor(text) {
+    const f = clipManifest[(text == null ? "" : String(text)).trim()];
+    return f ? ("audio/" + f + ".mp3") : null;
+  }
+  function allClips(texts) {
+    for (let i = 0; i < texts.length; i++) { if (!clipUrlFor(texts[i])) return false; }
+    return true;
+  }
+
+  let currentAudio = null;
+  function stopAudio() {
+    if (currentAudio) {
+      try { currentAudio.pause(); } catch (e) {}
+      currentAudio.onended = currentAudio.onerror = currentAudio.onloadedmetadata = null;
+      currentAudio = null;
+    }
+  }
+
+  // Play one clip. Optionally light up each word span across the clip's
+  // real duration (so the underline / karaoke keeps working with recorded
+  // audio). opts: { rate, btn, spans, total, onWord, onEnd, fallback }
+  function playClip(url, opts) {
+    opts = opts || {};
+    stopAudio();
+    if (synth && synth.speaking) synth.cancel();
+    const a = new Audio(url);
+    currentAudio = a;
+    a.playbackRate = opts.rate || 1;
+    try { a.preservesPitch = a.mozPreservesPitch = a.webkitPreservesPitch = true; } catch (e) {}
+    let timers = [];
+    function clearT() { timers.forEach(clearTimeout); timers = []; }
+    if (opts.btn) opts.btn.classList.add("speaking");
+    if (opts.spans && opts.spans.length && opts.onWord) {
+      a.onloadedmetadata = function () {
+        let durMs = (a.duration / (opts.rate || 1)) * 1000;
+        if (!isFinite(durMs) || durMs <= 0) durMs = 1600;
+        const total = opts.total || 1;
+        opts.spans.forEach(function (sp) {
+          const frac = (+sp.dataset.start) / total;
+          timers.push(setTimeout(function () { opts.onWord(sp); }, Math.round(frac * durMs)));
+        });
+      };
+    }
+    a.onended = function () {
+      clearT();
+      if (opts.btn) opts.btn.classList.remove("speaking");
+      if (opts.onEnd) opts.onEnd();
+      currentAudio = null;
+    };
+    a.onerror = function () {
+      clearT();
+      if (opts.btn) opts.btn.classList.remove("speaking");
+      currentAudio = null;
+      if (opts.fallback) opts.fallback();
+    };
+    const p = a.play();
+    if (p && p.catch) p.catch(function () {
+      clearT();
+      if (opts.btn) opts.btn.classList.remove("speaking");
+      currentAudio = null;
+      if (opts.fallback) opts.fallback();
+    });
+  }
+
   function loadVoices() {
     if (!synth) return;
     voices = synth.getVoices();
@@ -724,6 +807,7 @@
   }
 
   function cancelSpeech() {
+    stopAudio();
     if (synth && synth.speaking) synth.cancel();
     clearHighlights();
     clearSentenceHighlight();
@@ -734,6 +818,19 @@
   }
 
   function speakWord(text, forceSlow) {
+    const slow = !!(forceSlow || state.slow);
+    const url = clipUrlFor(text);
+    if (url) {
+      playClip(url, {
+        rate: slow ? 0.82 : 1, btn: listenBtn,
+        fallback: function () { ttsSpeakWord(text, slow); }
+      });
+      return;
+    }
+    ttsSpeakWord(text, slow);
+  }
+
+  function ttsSpeakWord(text, slow) {
     if (!synth) { warnNoSpeech(); return; }
     synth.cancel();
     clearHighlights();
@@ -741,7 +838,7 @@
     const v = pickVoice();
     if (v) u.voice = v;
     u.lang = (v && v.lang) || "en-US";
-    u.rate = (forceSlow || state.slow) ? SLOW_RATE : NORMAL_RATE;
+    u.rate = slow ? SLOW_RATE : NORMAL_RATE;
     u.pitch = 1.05; // slightly higher = friendlier for kids
     listenBtn.classList.add("speaking");
     u.onend = u.onerror = function () { listenBtn.classList.remove("speaking"); };
@@ -772,6 +869,28 @@
   //      engines (Android/iOS) that never fire boundary events. As soon as a
   //      real boundary arrives, the estimated timers are cancelled.
   function speakSentence() {
+    const item = current();
+    if (!item || !item.s) return;
+    clearSentenceHighlight();
+    clearSentenceTimers();
+    const url = clipUrlFor(item.s);
+    if (url) {
+      const spans = Array.prototype.slice.call(
+        wordSentence.querySelectorAll(".sentence-word")
+      );
+      playClip(url, {
+        rate: state.slow ? 0.82 : 1, btn: saySentenceBtn,
+        spans: spans, total: item.s.length || 1,
+        onWord: highlightSentenceSpan,
+        onEnd: clearSentenceHighlight,
+        fallback: ttsSpeakSentence
+      });
+      return;
+    }
+    ttsSpeakSentence();
+  }
+
+  function ttsSpeakSentence() {
     const item = current();
     if (!item || !item.s) return;
     if (!synth) { warnNoSpeech(); return; }
@@ -841,6 +960,50 @@
   }
 
   function soundItOut() {
+    const item = current();
+    if (!item) return;
+
+    const partsText = (item.p && item.p.length) ? item.p : [item.w];
+    // Reveal the phonics row so children can see the parts.
+    phonicsParts.classList.add("show");
+    phonicsParts.setAttribute("aria-hidden", "false");
+    clearHighlights();
+    const spans = Array.prototype.slice.call(
+      phonicsParts.querySelectorAll(".phonics-part")
+    );
+
+    // If every part + the whole word has a recorded clip, chain them.
+    if (allClips(partsText.concat([item.w]))) {
+      stopAudio();
+      if (synth && synth.speaking) synth.cancel();
+      phonicsBtn.classList.add("speaking");
+      let i = 0;
+      const playNext = function () {
+        if (i >= partsText.length) {
+          clearHighlights();
+          spans.forEach(function (s) { s.classList.add("active"); });
+          playClip(clipUrlFor(item.w), {
+            rate: 1,
+            onEnd: function () { spans.forEach(function (s) { s.classList.remove("active"); }); phonicsBtn.classList.remove("speaking"); },
+            fallback: function () { spans.forEach(function (s) { s.classList.remove("active"); }); phonicsBtn.classList.remove("speaking"); }
+          });
+          return;
+        }
+        clearHighlights();
+        if (spans[i]) spans[i].classList.add("active");
+        playClip(clipUrlFor(partsText[i]), {
+          rate: 0.85,
+          onEnd: function () { i++; setTimeout(playNext, 240); },
+          fallback: function () { i++; setTimeout(playNext, 240); }
+        });
+      };
+      playNext();
+      return;
+    }
+    ttsSoundItOut();
+  }
+
+  function ttsSoundItOut() {
     const item = current();
     if (!item) return;
     if (!synth) { warnNoSpeech(); return; }
@@ -1760,6 +1923,7 @@
       .forEach(function (s) { s.classList.remove("reading-word"); });
   }
   function stopQuizSpeech() {
+    stopAudio();
     if (synth && synth.speaking) synth.cancel();
     clearQuizTimers();
     clearQuizReading();
@@ -1767,6 +1931,27 @@
   }
 
   function speakQuestion() {
+    var item = quiz.list[quiz.index];
+    if (!item) return;
+    var text = quizQuestion.textContent;
+    var spans = Array.prototype.slice.call(quizQuestion.querySelectorAll(".q-word"));
+    clearQuizReading();
+    clearQuizTimers();
+    var url = clipUrlFor(text);
+    if (url) {
+      playClip(url, {
+        rate: quiz.rate / NORMAL_RATE, btn: quizReadBtn,
+        spans: spans, total: text.length || 1,
+        onWord: function (sp) { clearQuizReading(); sp.classList.add("reading-word"); },
+        onEnd: clearQuizReading,
+        fallback: ttsSpeakQuestion
+      });
+      return;
+    }
+    ttsSpeakQuestion();
+  }
+
+  function ttsSpeakQuestion() {
     var item = quiz.list[quiz.index];
     if (!item) return;
     if (!synth) { warnNoSpeech(); return; }
@@ -1849,6 +2034,40 @@
   $("#quizHomeBtn").addEventListener("click", function () {
     stopQuizSpeech(); showScreen(chooseScreen);
   });
+
+  /* ==========================================================
+     16b. Audio-clip string collector
+     ----------------------------------------------------------
+     Returns every exact string the app can speak. The build
+     script (generate_audio.py) uses this list to create one MP3
+     per string. Exposed on window so it can be dumped from the
+     browser console:  copy(JSON.stringify(window.__audioStrings()))
+     ========================================================== */
+  function collectAudioStrings() {
+    const set = {};
+    const add = function (t) {
+      if (t == null) return;
+      t = String(t).trim();
+      if (t) set[t] = true;
+    };
+    Object.keys(WORDS).forEach(function (g) {
+      WORDS[g].forEach(function (it) {
+        add(it.w); add(it.s);
+        (it.p || []).forEach(add);
+      });
+    });
+    NUMBER_WORDS.forEach(function (it) {
+      add(it.w); add(it.s);
+      (it.p || []).forEach(add);
+    });
+    MATHS.forEach(function (ch) {
+      ch.sections.forEach(function (sec) {
+        sec.questions.forEach(function (q) { add(q.q); });
+      });
+    });
+    return Object.keys(set);
+  }
+  try { window.__audioStrings = collectAudioStrings; } catch (e) {}
 
   /* ==========================================================
      17. Init
