@@ -280,6 +280,14 @@ main {
 .section-range { font-size: 1.15rem; font-weight: 800; word-break: break-word; }
 .section-meta { font-size: 0.8rem; color: var(--ink-soft); }
 
+/* Featured sections (Number Names, Math Words) stand out at the top. */
+.section-card-featured {
+  background: var(--sky);
+  border-bottom-color: var(--coral);
+}
+.section-card-featured .section-num { color: var(--coral-deep); }
+:root[data-theme="dark"] .section-card-featured { background: var(--sky-deep); }
+
 /* ---------- Learning: progress ---------- */
 .progress-wrap { margin: 6px 0 18px; }
 .progress-info {
@@ -375,12 +383,33 @@ main {
   margin: 18px auto 0;
   max-width: 30ch;
   color: var(--ink-soft);
-  font-size: clamp(1rem, 4vw, 1.25rem);
+  font-size: clamp(1.2rem, 5vw, 1.6rem);
   font-style: italic;
-  line-height: 1.4;
+  line-height: 1.45;
   min-height: 1.2em;
 }
 .word-sentence .hl { color: var(--coral-deep); font-style: normal; font-weight: 800; }
+
+/* "Say sentence" button under the example sentence */
+.btn-say-sentence {
+  margin: 14px auto 0;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--cream);
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: clamp(0.95rem, 3.6vw, 1.1rem);
+  min-height: 44px;
+  box-shadow: var(--card-shadow);
+  transition: transform 0.15s ease, filter 0.15s ease;
+  touch-action: manipulation;
+}
+.btn-say-sentence:hover { transform: translateY(-2px); }
+.btn-say-sentence:active { transform: scale(0.95); }
+.btn-say-sentence.speaking { animation: pulse 1s ease infinite; }
 
 /* ---------- Buttons (shared) ---------- */
 .btn {
@@ -435,12 +464,11 @@ main {
 /* Nav row */
 .nav-row {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
 .btn-nav { background: var(--card-bg); }
 .btn-next { background: var(--gold); }
-.btn-repeat { min-width: 64px; font-size: 1.4rem; padding: 12px; }
 
 /* ---------- Finish screen ---------- */
 .finish-card {

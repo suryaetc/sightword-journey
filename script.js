@@ -297,6 +297,53 @@
     });
   });
 
+  /* ----------------------------------------------------------
+     Named groups within Std 1 (shown as their own sections):
+       - Math / concept words
+       - Number names (one..twenty, then tens to one hundred)
+     ---------------------------------------------------------- */
+
+  // These Std-1 words form the dedicated "Math Words" section
+  // (pulled out of the alphabetical sections so they group together).
+  const MATH_WORD_NAMES = [
+    "add", "match", "less", "digit", "object", "number", "plus", "subtract",
+    "place", "value", "zero", "use", "than", "sort", "compare", "similar",
+    "after", "before", "near", "equal", "different", "alike", "input",
+    "output", "rule"
+  ];
+
+  // Number names — their own section. Words with phonics splits + sentences.
+  const NUMBER_WORDS = [
+    { w: "one",       p: ["o", "ne"],       s: "I have one dog." },
+    { w: "two",       p: ["tw", "o"],       s: "I see two cats." },
+    { w: "three",     p: ["thr", "ee"],     s: "Three little pigs." },
+    { w: "four",      p: ["f", "our"],      s: "A car has four wheels." },
+    { w: "five",      p: ["f", "ive"],      s: "Give me five!" },
+    { w: "six",       p: ["s", "ix"],       s: "A bug has six legs." },
+    { w: "seven",     p: ["sev", "en"],     s: "Seven days in a week." },
+    { w: "eight",     p: ["eigh", "t"],     s: "A spider has eight legs." },
+    { w: "nine",      p: ["n", "ine"],      s: "Nine is almost ten." },
+    { w: "ten",       p: ["t", "en"],       s: "Ten fingers and toes." },
+    { w: "eleven",    p: ["e", "lev", "en"],s: "Eleven players on a team." },
+    { w: "twelve",    p: ["tw", "elve"],    s: "Twelve months in a year." },
+    { w: "thirteen",  p: ["thir", "teen"],  s: "Thirteen is a big number." },
+    { w: "fourteen",  p: ["four", "teen"],  s: "Fourteen days is two weeks." },
+    { w: "fifteen",   p: ["fif", "teen"],   s: "Fifteen minutes to play." },
+    { w: "sixteen",   p: ["six", "teen"],   s: "Sixteen crayons in the box." },
+    { w: "seventeen", p: ["seven", "teen"], s: "Seventeen is more than ten." },
+    { w: "eighteen",  p: ["eigh", "teen"],  s: "Eighteen candles on a cake." },
+    { w: "nineteen",  p: ["nine", "teen"],  s: "Nineteen comes before twenty." },
+    { w: "twenty",    p: ["twen", "ty"],    s: "Twenty toes in the room." },
+    { w: "thirty",    p: ["thir", "ty"],    s: "Thirty days in June." },
+    { w: "forty",     p: ["for", "ty"],     s: "Forty winks means a nap." },
+    { w: "fifty",     p: ["fif", "ty"],     s: "Fifty stars on the flag." },
+    { w: "sixty",     p: ["six", "ty"],     s: "Sixty seconds in a minute." },
+    { w: "seventy",   p: ["seven", "ty"],   s: "Seventy is a big age." },
+    { w: "eighty",    p: ["eigh", "ty"],    s: "Eighty is near a hundred." },
+    { w: "ninety",    p: ["nine", "ty"],    s: "Ninety comes after eighty." },
+    { w: "hundred",   p: ["hun", "dred"],   s: "One hundred cents in a dollar." }
+  ];
+
   /* ==========================================================
      2. STATE
      ========================================================== */
@@ -370,10 +417,10 @@
   const listenBtn    = $("#listenBtn");
   const slowBtn      = $("#slowBtn");
   const phonicsBtn   = $("#phonicsBtn");
+  const saySentenceBtn = $("#saySentenceBtn");
   const knowBtn      = $("#knowBtn");
   const prevBtn      = $("#prevBtn");
   const nextBtn      = $("#nextBtn");
-  const repeatBtn    = $("#repeatBtn");
 
   const finishText   = $("#finishText");
   const againBtn     = $("#againBtn");
@@ -422,10 +469,9 @@
     return list;
   }
 
-  // Split a grade's sorted words into fixed-size alphabetical sections.
+  // Split a list of word objects into fixed-size chunks.
   const SECTION_SIZE = 12;
-  function buildSections(grade) {
-    const words = sortedGrade(grade);
+  function chunk(words) {
     const sections = [];
     for (let i = 0; i < words.length; i += SECTION_SIZE) {
       sections.push(words.slice(i, i + SECTION_SIZE));
@@ -436,29 +482,59 @@
   // The grade the section screen is currently showing.
   let currentGrade = null;
 
+  // Create one section card and append it to the grid.
+  function addSectionCard(opts) {
+    const btn = document.createElement("button");
+    btn.className = "section-card" + (opts.featured ? " section-card-featured" : "");
+    btn.setAttribute("role", "listitem");
+    btn.innerHTML =
+      '<span class="section-num">' + opts.tag + "</span>" +
+      '<span class="section-range">' + opts.title + "</span>" +
+      '<span class="section-meta">' + opts.words.length + " words</span>";
+    btn.addEventListener("click", function () {
+      beginSession(opts.words, opts.label);
+    });
+    sectionGrid.appendChild(btn);
+  }
+
   // Open the section-picker screen for a grade.
   function openGrade(grade) {
     currentGrade = grade;
-    const words = sortedGrade(grade);
     sectionHeading.textContent = "Std " + grade;
-    sectionSubtitle.textContent =
-      "Pick a section, or practice all " + words.length + " words.";
-
     sectionGrid.innerHTML = "";
-    buildSections(grade).forEach(function (sec, i) {
+
+    // Regular sight words for this grade, alphabetically.
+    let regular = sortedGrade(grade);
+
+    // Std 1 gets two dedicated, featured sections up top:
+    //   Number Names, then Math Words (removed from the plain sections).
+    if (grade === 1) {
+      const mathSet = {};
+      MATH_WORD_NAMES.forEach(function (n) { mathSet[n] = true; });
+      const mathWords = regular.filter(function (it) { return mathSet[it.w]; });
+      regular = regular.filter(function (it) { return !mathSet[it.w]; });
+
+      addSectionCard({
+        tag: "🔢 Numbers", title: "one – hundred",
+        words: NUMBER_WORDS, label: "Std 1 · Number Names", featured: true
+      });
+      addSectionCard({
+        tag: "➕ Math Words", title: "add – rule",
+        words: mathWords, label: "Std 1 · Math Words", featured: true
+      });
+    }
+
+    sectionSubtitle.textContent =
+      "Pick a section, or practice all " + regular.length + " sight words.";
+
+    // Alphabetical sections of the remaining sight words.
+    chunk(regular).forEach(function (sec, i) {
       const first = sec[0].w;
       const last = sec[sec.length - 1].w;
-      const btn = document.createElement("button");
-      btn.className = "section-card";
-      btn.setAttribute("role", "listitem");
-      btn.innerHTML =
-        '<span class="section-num">Section ' + (i + 1) + "</span>" +
-        '<span class="section-range">' + first + " – " + last + "</span>" +
-        '<span class="section-meta">' + sec.length + " words</span>";
-      btn.addEventListener("click", function () {
-        beginSession(sec, "Std " + grade + " · " + first + "–" + last);
+      addSectionCard({
+        tag: "Section " + (i + 1), title: first + " – " + last,
+        words: sec, label: "Std " + grade + " · " + first + "–" + last
       });
-      sectionGrid.appendChild(btn);
     });
 
     showScreen(sectionScreen);
@@ -622,6 +698,24 @@
     synth.speak(u);
   }
 
+  // Speak the whole example sentence for the current word.
+  function speakSentence() {
+    const item = current();
+    if (!item || !item.s) return;
+    if (!synth) { warnNoSpeech(); return; }
+    synth.cancel();
+    clearHighlights();
+    const u = new SpeechSynthesisUtterance(item.s);
+    const v = pickVoice();
+    if (v) u.voice = v;
+    u.lang = (v && v.lang) || "en-US";
+    u.rate = state.slow ? SLOW_RATE : NORMAL_RATE;
+    u.pitch = 1.12;
+    saySentenceBtn.classList.add("speaking");
+    u.onend = u.onerror = function () { saySentenceBtn.classList.remove("speaking"); };
+    synth.speak(u);
+  }
+
   /* ---- Phonics: speak each part in sequence, highlighting it ---- */
   function clearHighlights() {
     const parts = phonicsParts.querySelectorAll(".phonics-part");
@@ -643,44 +737,54 @@
       phonicsParts.querySelectorAll(".phonics-part")
     );
 
+    const partsText = (item.p && item.p.length) ? item.p : [item.w];
+
     phonicsBtn.classList.add("speaking");
 
-    // IMPORTANT: We speak the WHOLE word slowly rather than each part.
-    // Speech synthesis reads isolated letters/chunks (e.g. "a", "ny", "th")
-    // as letter NAMES ("ay", "en-why"), which sounds like spelling and
-    // confuses young readers. Saying the whole word slowly gives a correct
-    // pronunciation, while we sweep the highlight across the parts so kids
-    // can follow along visually with the sounds.
-    const u = new SpeechSynthesisUtterance(item.w);
-    const v = pickVoice();
-    if (v) { u.voice = v; u.lang = v.lang; }
-    u.rate = 0.5;        // extra slow for sounding out
-    u.pitch = 1.15;
-
-    // Sweep the highlight through the parts while the word is spoken.
-    let idx = 0;
-    clearHighlights();
-    if (spans[0]) spans[0].classList.add("active");
-    const dwell = spans.length > 1 ? 560 : 700; // ms per part
-    const sweep = setInterval(function () {
-      idx++;
-      clearHighlights();
-      if (idx < spans.length && spans[idx]) {
-        spans[idx].classList.add("active");
-      } else {
-        clearInterval(sweep); // reached the last part; hold it lit
-        if (spans.length) spans[spans.length - 1].classList.add("active");
+    // Speak each part in sequence, highlighting it as it is spoken,
+    // then finish by saying the whole word smoothly.
+    let i = 0;
+    function speakPart() {
+      if (i >= partsText.length) {
+        clearHighlights();
+        const whole = new SpeechSynthesisUtterance(item.w);
+        const v = pickVoice();
+        if (v) { whole.voice = v; whole.lang = v.lang; }
+        whole.rate = NORMAL_RATE;
+        whole.pitch = 1.15;
+        // Light every part together while the whole word is spoken.
+        spans.forEach(function (s) { s.classList.add("active"); });
+        whole.onend = function () {
+          spans.forEach(function (s) { s.classList.remove("active"); });
+          phonicsBtn.classList.remove("speaking");
+        };
+        whole.onerror = function () {
+          spans.forEach(function (s) { s.classList.remove("active"); });
+          phonicsBtn.classList.remove("speaking");
+        };
+        synth.speak(whole);
+        return;
       }
-    }, dwell);
 
-    u.onend = u.onerror = function () {
-      clearInterval(sweep);
-      // Briefly light every part together, then fade out.
-      spans.forEach(function (s) { s.classList.add("active"); });
-      setTimeout(clearHighlights, 450);
-      phonicsBtn.classList.remove("speaking");
-    };
-    synth.speak(u);
+      clearHighlights();
+      if (spans[i]) spans[i].classList.add("active");
+
+      const u = new SpeechSynthesisUtterance(partsText[i]);
+      const v = pickVoice();
+      if (v) { u.voice = v; u.lang = v.lang; }
+      u.rate = SLOW_RATE;      // always slow for sounding out
+      u.pitch = 1.15;
+      u.onend = function () {
+        i++;
+        setTimeout(speakPart, 260); // small pause so kids can follow
+      };
+      u.onerror = function () {
+        i++;
+        setTimeout(speakPart, 260);
+      };
+      synth.speak(u);
+    }
+    speakPart();
   }
 
   let warnedNoSpeech = false;
@@ -887,7 +991,7 @@
 
   listenBtn.addEventListener("click", function () { speakWord(current().w, false); });
   phonicsBtn.addEventListener("click", soundItOut);
-  repeatBtn.addEventListener("click", function () { speakWord(current().w, false); });
+  saySentenceBtn.addEventListener("click", speakSentence);
 
   slowBtn.addEventListener("click", function () {
     state.slow = !state.slow;
