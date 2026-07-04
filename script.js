@@ -657,23 +657,54 @@
   }
 
   // Prefer a clear English voice; nudge toward friendlier ones if present.
+  // Score each available voice and pick the most natural English one.
+  // Modern devices ship higher-quality "neural/natural" voices under
+  // various names; we rank those highest and avoid the robotic "compact"
+  // / eSpeak fallbacks. The result is cached until the voice list changes.
+  let cachedVoice = null;
+  let cachedVoiceCount = -1;
+
+  function scoreVoice(v) {
+    const name = (v.name || "").toLowerCase();
+    const lang = (v.lang || "").toLowerCase();
+    let score = 0;
+
+    // Must be English to pronounce sight words correctly.
+    if (/^en/.test(lang)) score += 40; else score -= 100;
+    if (lang === "en-us" || lang === "en-gb") score += 8;
+
+    // Quality markers found in modern neural/natural voice names.
+    if (/natural|neural|online/.test(name)) score += 40;
+    if (/enhanced|premium/.test(name)) score += 30;
+
+    // Known good, pleasant voices across platforms.
+    if (/\bgoogle\b/.test(name)) score += 25;               // Chrome/Android
+    if (/samantha|karen|moira|serena|allison|ava|nicky/.test(name)) score += 18; // Apple
+    if (/aria|jenny|guy|libby|sonia|natasha/.test(name)) score += 18; // MS neural
+
+    // Penalise known low-quality / robotic engines.
+    if (/compact|eloquence|espeak|festival|pico/.test(name)) score -= 40;
+
+    // A gentle nudge toward warmer default voices for young children.
+    if (/female|woman|samantha|aria|jenny|libby|sonia|karen/.test(name)) score += 4;
+
+    return score;
+  }
+
   function pickVoice() {
     if (!voices.length) loadVoices();
     if (!voices.length) return null;
-    const prefs = [
-      "Google UK English Female",
-      "Google US English",
-      "Samantha",
-      "Karen",
-      "Microsoft Zira",
-      "Microsoft Aria"
-    ];
-    for (const name of prefs) {
-      const v = voices.find(function (vv) { return vv.name === name; });
-      if (v) return v;
-    }
-    // Any en-* voice, prefer female-sounding as a gentle default
-    return voices.find(function (v) { return /^en/i.test(v.lang); }) || voices[0];
+    // Reuse the last choice unless the voice list has changed.
+    if (cachedVoice && cachedVoiceCount === voices.length) return cachedVoice;
+
+    let best = null, bestScore = -Infinity;
+    voices.forEach(function (v) {
+      const s = scoreVoice(v);
+      if (s > bestScore) { bestScore = s; best = v; }
+    });
+    cachedVoice = best || voices[0];
+    cachedVoiceCount = voices.length;
+    return cachedVoice;
   }
 
   function cancelSpeech() {
@@ -692,7 +723,7 @@
     if (v) u.voice = v;
     u.lang = (v && v.lang) || "en-US";
     u.rate = (forceSlow || state.slow) ? SLOW_RATE : NORMAL_RATE;
-    u.pitch = 1.15; // slightly higher = friendlier for kids
+    u.pitch = 1.05; // slightly higher = friendlier for kids
     listenBtn.classList.add("speaking");
     u.onend = u.onerror = function () { listenBtn.classList.remove("speaking"); };
     synth.speak(u);
@@ -710,7 +741,7 @@
     if (v) u.voice = v;
     u.lang = (v && v.lang) || "en-US";
     u.rate = state.slow ? SLOW_RATE : NORMAL_RATE;
-    u.pitch = 1.12;
+    u.pitch = 1.05;
     saySentenceBtn.classList.add("speaking");
     u.onend = u.onerror = function () { saySentenceBtn.classList.remove("speaking"); };
     synth.speak(u);
@@ -751,7 +782,7 @@
         const v = pickVoice();
         if (v) { whole.voice = v; whole.lang = v.lang; }
         whole.rate = NORMAL_RATE;
-        whole.pitch = 1.15;
+        whole.pitch = 1.05;
         // Light every part together while the whole word is spoken.
         spans.forEach(function (s) { s.classList.add("active"); });
         whole.onend = function () {
@@ -773,7 +804,7 @@
       const v = pickVoice();
       if (v) { u.voice = v; u.lang = v.lang; }
       u.rate = SLOW_RATE;      // always slow for sounding out
-      u.pitch = 1.15;
+      u.pitch = 1.05;
       u.onend = function () {
         i++;
         setTimeout(speakPart, 260); // small pause so kids can follow
