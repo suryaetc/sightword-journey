@@ -720,6 +720,7 @@
     if (synth && synth.speaking) synth.cancel();
     clearHighlights();
     clearSentenceHighlight();
+    clearSentenceTimers();
     listenBtn.classList.remove("speaking");
     phonicsBtn.classList.remove("speaking");
     saySentenceBtn.classList.remove("speaking");
@@ -746,7 +747,23 @@
       .forEach(function (s) { s.classList.remove("speaking-word"); });
   }
 
+  let sentenceTimers = [];
+  function clearSentenceTimers() {
+    sentenceTimers.forEach(clearTimeout);
+    sentenceTimers = [];
+  }
+
+  function highlightSentenceSpan(sp) {
+    clearSentenceHighlight();
+    if (sp) sp.classList.add("speaking-word");
+  }
+
   // Speak the whole example sentence, highlighting each word as it is read.
+  // Two mechanisms keep this working on every device:
+  //   1. onboundary events — accurate, used when the TTS engine emits them.
+  //   2. a time-based estimate (onstart) — a fallback for the many mobile
+  //      engines (Android/iOS) that never fire boundary events. As soon as a
+  //      real boundary arrives, the estimated timers are cancelled.
   function speakSentence() {
     const item = current();
     if (!item || !item.s) return;
@@ -754,10 +771,12 @@
     synth.cancel();
     clearHighlights();
     clearSentenceHighlight();
+    clearSentenceTimers();
 
     const spans = Array.prototype.slice.call(
       wordSentence.querySelectorAll(".sentence-word")
     );
+    const total = item.s.length || 1;
 
     const u = new SpeechSynthesisUtterance(item.s);
     const v = pickVoice();
@@ -767,11 +786,13 @@
     u.pitch = 1.05;
     saySentenceBtn.classList.add("speaking");
 
-    // Light up the word at each spoken boundary (karaoke style).
-    // Not every TTS engine emits word boundaries; if none fire, the audio
-    // still plays and we simply skip the highlight (graceful fallback).
+    let usedBoundary = false;
+
+    // (1) Accurate: highlight the word at each spoken boundary.
     u.onboundary = function (e) {
       if (e.name && e.name !== "word") return;
+      usedBoundary = true;
+      clearSentenceTimers(); // boundaries are exact; drop the estimate
       const idx = e.charIndex;
       let target = null;
       for (let i = 0; i < spans.length; i++) {
@@ -780,11 +801,26 @@
         if (idx >= start && idx < end) { target = spans[i]; break; }
         if (start <= idx) target = spans[i]; // fallback: last word started
       }
-      clearSentenceHighlight();
-      if (target) target.classList.add("speaking-word");
+      highlightSentenceSpan(target);
+    };
+
+    // (2) Fallback: estimate each word's timing from its position and the
+    // speaking rate, and light it up on a timer. Cancelled if boundaries fire.
+    u.onstart = function () {
+      if (usedBoundary) return;
+      const msPerChar = 68 / (u.rate || 1);          // ~natural reading pace
+      const totalMs = Math.max(600, total * msPerChar);
+      spans.forEach(function (sp) {
+        const frac = (+sp.dataset.start) / total;
+        const t = setTimeout(function () {
+          if (!usedBoundary) highlightSentenceSpan(sp);
+        }, Math.round(frac * totalMs));
+        sentenceTimers.push(t);
+      });
     };
 
     u.onend = u.onerror = function () {
+      clearSentenceTimers();
       saySentenceBtn.classList.remove("speaking");
       clearSentenceHighlight();
     };
