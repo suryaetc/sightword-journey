@@ -492,7 +492,8 @@
       '<span class="section-range">' + opts.title + "</span>" +
       '<span class="section-meta">' + opts.words.length + " words</span>";
     btn.addEventListener("click", function () {
-      beginSession(opts.words, opts.label);
+      // Words within a section play in a fresh random order each time.
+      beginSession(shuffle(opts.words), opts.label);
     });
     sectionGrid.appendChild(btn);
   }
