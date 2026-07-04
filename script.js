@@ -388,11 +388,18 @@
      ========================================================== */
   const $ = function (sel) { return document.querySelector(sel); };
 
+  const chooseScreen = $("#chooseScreen");
   const homeScreen   = $("#homeScreen");
   const sectionScreen= $("#sectionScreen");
   const learnScreen  = $("#learnScreen");
   const finishScreen = $("#finishScreen");
-  const screens      = [homeScreen, sectionScreen, learnScreen, finishScreen];
+  const mathsChapterScreen = $("#mathsChapterScreen");
+  const mathsSectionScreen = $("#mathsSectionScreen");
+  const quizScreen   = $("#quizScreen");
+  const quizResultScreen = $("#quizResultScreen");
+  const screens      = [chooseScreen, homeScreen, sectionScreen, learnScreen,
+                        finishScreen, mathsChapterScreen, mathsSectionScreen,
+                        quizScreen, quizResultScreen];
 
   const sectionHeading  = $("#sectionHeading");
   const sectionSubtitle = $("#sectionSubtitle");
@@ -438,7 +445,7 @@
       s.classList.toggle("active", isActive);
       s.hidden = !isActive;
     });
-    homeBtn.hidden = (el === homeScreen);
+    homeBtn.hidden = (el === chooseScreen);
     // scroll to top for a fresh view
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -1118,12 +1125,22 @@
 
   homeBtn.addEventListener("click", function () {
     cancelSpeech();
+    stopQuizSpeech();
     updateOverall();
-    showScreen(homeScreen);
+    showScreen(chooseScreen);
   });
   finishHomeBtn.addEventListener("click", function () {
     updateOverall();
+    showScreen(chooseScreen);
+  });
+
+  // Opening chooser: Sight Words vs Maths Test.
+  $("#chooseWordsBtn").addEventListener("click", function () {
+    updateOverall();
     showScreen(homeScreen);
+  });
+  $("#chooseMathsBtn").addEventListener("click", function () {
+    openMathsChapters();
   });
   againBtn.addEventListener("click", function () {
     state.index = 0;
@@ -1165,10 +1182,679 @@
   }
 
   /* ==========================================================
-     16. Init
+     16. MATHS TEST MODE
+     ----------------------------------------------------------
+     A second activity: multiple-choice maths questions grouped
+     into chapters and sections. Reuses the shared speech engine
+     (pickVoice/synth), confetti, theme and screen switching.
+     Many picture questions from the workbook are re-drawn here
+     with small inline visuals (abacus, number line, count chips)
+     so they work offline and read aloud cleanly.
+     ========================================================== */
+
+  /* ---- Small visual builders (returned as HTML strings) ---- */
+  function A(tens, ones) {                       // abacus: tens + ones rods
+    function rod(n, label) {
+      var beads = "";
+      for (var i = 0; i < n; i++) beads += '<i class="ab-bead c' + (i % 5) + '"></i>';
+      return '<span class="ab-rod"><span class="ab-beads">' + beads +
+             '</span><span class="ab-label">' + label + "</span></span>";
+    }
+    return '<span class="abacus">' + rod(tens, "T") + rod(ones, "O") + "</span>";
+  }
+
+  function NL(maxN, arcs) {                       // number line with jump arcs
+    var step = 24, x0 = 18, y = 46, W = x0 + maxN * step + 14, H = 62;
+    var s = '<svg class="numline" viewBox="0 0 ' + W + ' ' + H +
+            '" role="img" aria-hidden="true">';
+    s += '<line class="nl-axis" x1="8" y1="' + y + '" x2="' + (W - 5) + '" y2="' + y + '"/>';
+    for (var i = 0; i <= maxN; i++) {
+      var x = x0 + i * step;
+      s += '<line class="nl-tick" x1="' + x + '" y1="' + (y - 4) + '" x2="' + x + '" y2="' + (y + 4) + '"/>';
+      s += '<text class="nl-num" x="' + x + '" y="' + (y + 15) + '">' + i + "</text>";
+    }
+    arcs.forEach(function (a) {
+      var x1 = x0 + a[0] * step, x2 = x0 + a[1] * step, r = (x2 - x1) / 2;
+      s += '<path class="nl-arc" d="M ' + x1 + " " + y + " A " + r + " " + r +
+           " 0 0 1 " + x2 + " " + y + '"/>';
+      s += '<path class="nl-arrow" d="M ' + (x2 - 5) + " " + (y - 6) + " L " + x2 +
+           " " + y + " L " + (x2 - 7) + " " + (y - 1) + ' Z"/>';
+    });
+    return s + "</svg>";
+  }
+
+  function CH(items) {                            // labelled number chips
+    return '<span class="mchips">' + items.map(function (it) {
+      return '<span class="mchip">' +
+        (it.e ? '<span class="mchip-e" aria-hidden="true">' + it.e + "</span>" : "") +
+        "<b>" + it.n + "</b>" +
+        (it.t ? "<em>" + it.t + "</em>" : "") + "</span>";
+    }).join("") + "</span>";
+  }
+
+  function ROW(e, n) {                            // a row of n emoji
+    var s = "";
+    for (var i = 0; i < n; i++) s += e;
+    return '<span class="erow" aria-hidden="true">' + s + "</span>";
+  }
+
+  function GROUP(emoji, nums) {                    // numbers written on an object
+    return '<span class="ngroup"><span class="ngroup-emoji" aria-hidden="true">' + emoji +
+      '</span><span class="ngroup-nums">' +
+      nums.map(function (n) { return "<b>" + n + "</b>"; }).join("") +
+      "</span></span>";
+  }
+
+  // Countable scene: show the actual objects (no number) grouped into
+  // labelled containers so the child can count and compare. Each item:
+  //   { e: emoji, n: how many, t: label, bar: branch?, base: base emoji }
+  function SET(items) {
+    return '<span class="cset">' + items.map(function (it) {
+      var things = "";
+      for (var i = 0; i < it.n; i++) things += it.e;
+      return '<span class="cset-item">' +
+        '<span class="cset-things" aria-hidden="true">' + things + "</span>" +
+        (it.bar ? '<span class="cset-bar" aria-hidden="true"></span>' : "") +
+        (it.base ? '<span class="cset-base" aria-hidden="true">' + it.base + "</span>" : "") +
+        '<span class="cset-label">' + it.t + "</span></span>";
+    }).join("") + "</span>";
+  }
+
+  function EQ(html) { return '<span class="meq">' + html + "</span>"; }
+
+  function VSUM() {                               // vertical addition puzzle
+    return '<span class="vsum"><span class="vr">1&nbsp;5</span>' +
+           '<span class="vr">+&nbsp;<b>P</b>&nbsp;3</span>' +
+           '<span class="vbar"></span><span class="vr">6&nbsp;8</span></span>';
+  }
+
+  function TRAIN() {
+    return '<span class="train"><span aria-hidden="true">🚂</span>' +
+      ["A", "B", "C", "D", "E", "F"].map(function (c) {
+        return '<span class="coach">' + c + "</span>";
+      }).join("") + "</span>";
+  }
+
+  /* ---- Question bank ---- */
+  var MATHS = [
+    {
+      id: "number-sense", label: "Number Sense", emoji: "🔢",
+      sections: [
+        {
+          id: "reasoning", label: "Mathematical Reasoning", emoji: "🧠",
+          questions: [
+            { q: "Which fish shows the greatest number?",
+              visual: CH([{ e: "🐟", n: 92, t: "P" }, { e: "🐟", n: 97, t: "Q" }, { e: "🐟", n: 79, t: "R" }, { e: "🐟", n: 62, t: "S" }]),
+              options: ["Fish P", "Fish Q", "Fish R", "Fish S"], answer: 1,
+              explain: "97 is the biggest of 92, 97, 79 and 62. Fish Q shows 97." },
+            { q: "Which number comes just after 72?",
+              options: ["Twenty seven", "Seventy two", "Seventy three", "Thirty seven"], answer: 2,
+              explain: "Counting up, the number right after 72 is 73 — seventy three." },
+            { q: "In which option are the numbers in order from smallest to biggest?",
+              options: ["25, 52, 65, 56", "25, 65, 52, 56", "25, 65, 56, 52", "25, 52, 56, 65"], answer: 3,
+              explain: "Smallest to biggest is 25, 52, 56, 65." },
+            { q: "There are 6 tens and 5 ones in which number?",
+              visual: A(6, 5),
+              options: ["56", "65", "60", "50"], answer: 1,
+              explain: "6 tens make 60 and 5 ones make 5. Together that is 65." },
+            { q: "What comes before 85 but after 83?",
+              options: ["48", "84", "44", "78"], answer: 1,
+              explain: "The number between 83 and 85 is 84." },
+            { q: "What number is shown on the abacus?",
+              visual: A(5, 9),
+              options: ["Thirty four", "Eighty two", "Fifty nine", "Twenty nine"], answer: 2,
+              explain: "5 tens and 9 ones make 59 — fifty nine." },
+            { q: "The greatest number of birds are sitting on which branch?",
+              visual: SET([{ e: "🐦", n: 2, t: "W", bar: true }, { e: "🐦", n: 3, t: "X", bar: true }, { e: "🐦", n: 5, t: "Y", bar: true }, { e: "🐦", n: 4, t: "Z", bar: true }]),
+              options: ["Branch W", "Branch X", "Branch Y", "Branch Z"], answer: 2,
+              explain: "Branch Y has the most birds — 5 birds." },
+            { q: "Select the correct match.",
+              options: ["31 = 1 ten 3 ones", "38 = 8 tens 3 ones", "54 = 5 tens 4 ones", "69 = 9 tens 6 ones"], answer: 2,
+              explain: "54 is 5 tens and 4 ones. The other matches are wrong." },
+            { q: "Which apple shows the smallest number?",
+              visual: CH([{ e: "🍎", n: 42, t: "P" }, { e: "🍎", n: 71, t: "Q" }, { e: "🍎", n: 17, t: "R" }, { e: "🍎", n: 44, t: "S" }]),
+              options: ["Apple Q", "Apple S", "Apple R", "Apple P"], answer: 2,
+              explain: "17 is the smallest of 42, 71, 17 and 44. Apple R shows 17." },
+            { q: "Which set has more objects than these 5 rackets?",
+              visual: ROW("🎾", 5),
+              options: [ROW("💍", 5), ROW("🧺", 3), ROW("🥪", 5), ROW("🥤", 6)], optHtml: true, answer: 3,
+              explain: "There are 5 rackets. Only the 6 cups are more than 5." },
+            { q: "Which abacus shows the number of dolls?",
+              visual: ROW("👧", 7),
+              options: [A(0, 5), A(0, 7), A(1, 2), A(0, 8)], optHtml: true, answer: 1,
+              explain: "There are 7 dolls, so the abacus shows 0 tens and 7 ones." },
+            { q: "Which number is NOT shown on the mango?",
+              visual: GROUP("🥭", [56, 25, 34, 82, 24]),
+              options: ["24  (2 tens 4 ones)", "37  (3 tens 7 ones)", "82  (8 tens 2 ones)", "56  (5 tens 6 ones)"], answer: 1,
+              explain: "The mango shows 56, 25, 34, 82 and 24. The number 37 is not there." },
+            { q: "What does this number line show?",
+              visual: NL(10, [[0, 2], [2, 4], [4, 6], [6, 8], [8, 10]]),
+              options: ["Skip counting by 1's", "Skip counting by 4's", "Skip counting by 3's", "Skip counting by 2's"], answer: 3,
+              explain: "The jumps land on 2, 4, 6, 8, 10 — skip counting by 2's." },
+            { q: "Count the caps. Which number matches?",
+              visual: ROW("🧢", 15),
+              options: ["Eleven", "Sixteen", "Fifteen", "Eighteen"], answer: 2,
+              explain: "There are 15 caps — fifteen." },
+            { q: "How many butterflies are there altogether?",
+              visual: ROW("🦋", 18),
+              options: ["1 ten 8 ones (18)", "18 tens", "1 ten 6 ones (16)", "8 tens (80)"], answer: 0,
+              explain: "18 butterflies is 1 ten and 8 ones, which is 18." }
+          ]
+        },
+        {
+          id: "everyday", label: "Everyday Maths", emoji: "🛒",
+          questions: [
+            { q: "Kajal bought a soft toy with a number more than 12 but less than 20. Which toy can be Kajal's?",
+              visual: CH([{ e: "🐷", n: 9 }, { e: "🦁", n: 22 }, { e: "🐵", n: 17 }, { e: "🦓", n: 25 }]),
+              options: ["Toy 9", "Toy 22", "Toy 17", "Toy 25"], answer: 2,
+              explain: "Only 17 is more than 12 and less than 20." },
+            { q: "Ananya has 65 blocks, Riddhi has 50 blocks and Suman has 42 blocks. Who has the least blocks?",
+              visual: CH([{ e: "🧱", n: 65, t: "Ananya" }, { e: "🧱", n: 50, t: "Riddhi" }, { e: "🧱", n: 42, t: "Suman" }]),
+              options: ["Riddhi", "Suman", "Ananya", "Can't say"], answer: 1,
+              explain: "42 is the smallest number, so Suman has the least blocks." },
+            { q: "A man has 6 hens and 4 cows. Which sentence is false?",
+              visual: ROW("🐔", 6) + ROW("🐄", 4),
+              options: ["Hens are more than cows", "Cows are less than hens", "Cows are equal to hens", "There are 6 hens"], answer: 2,
+              explain: "There are 6 hens and 4 cows, so cows are not equal to hens. That sentence is false." },
+            { q: "The pictures show balloons bought by four friends. Who bought the most balloons?",
+              visual: SET([{ e: "🎈", n: 5, t: "Tania" }, { e: "🎈", n: 3, t: "Sahil" }, { e: "🎈", n: 6, t: "Teena" }, { e: "🎈", n: 4, t: "Varun" }]),
+              options: ["Varun", "Sahil", "Teena", "Tania"], answer: 2,
+              explain: "Teena has the most balloons — 6 balloons." },
+            { q: "Sunil's parrot has a number greater than 60 but less than 70. Which is Sunil's parrot?",
+              visual: CH([{ e: "🦜", n: 25, t: "P" }, { e: "🦜", n: 35, t: "Q" }, { e: "🦜", n: 63, t: "R" }, { e: "🦜", n: 18, t: "S" }, { e: "🦜", n: 41, t: "T" }, { e: "🦜", n: 72, t: "U" }]),
+              options: ["Parrot U", "Parrot S", "Parrot P", "Parrot R"], answer: 3,
+              explain: "63 is greater than 60 and less than 70. Parrot R shows 63." }
+          ]
+        },
+        {
+          id: "achievers", label: "Achievers Section", emoji: "🏆",
+          questions: [
+            { q: "Which number line shows a frog jumping by 5's?",
+              options: [NL(10, [[0, 2], [2, 4], [4, 6]]), NL(10, [[0, 3], [3, 6], [6, 9]]), NL(10, [[0, 4], [4, 8]]), NL(10, [[0, 5], [5, 10]])], optHtml: true, answer: 3,
+              explain: "Jumps of 5 land on 5 and then 10." },
+            { q: "Which numbers are less than 42?  P is 2 tens 7 ones, Q is 3 tens 4 ones, R is 5 tens 3 ones, S is 4 tens 3 ones.",
+              options: ["Both P and Q", "Only P", "P, Q and S", "P, Q, R and S"], answer: 0,
+              explain: "P is 27 and Q is 34 — both less than 42. R is 53 and S is 43, which are not. So both P and Q." },
+            { q: "Look at the sets of objects. Which sentence is correct?",
+              visual: SET([{ e: "💡", n: 6, t: "Set X" }, { e: "🍃", n: 6, t: "Set Y" }, { e: "🎈", n: 5, t: "Set Z" }]),
+              options: ["Set Y has more items than set Z", "Set X has less items than set Y", "Set Z has more items than set X", "All the sets are equal"], answer: 0,
+              explain: "Set Y has 6 and set Z has 5, so Y has more items than Z." },
+            { q: "A train has coaches A, B, C, D, E, F in order. Coach blank is just before E. Coach C is blank B and D. Coach B is just blank A.",
+              visual: TRAIN(),
+              options: ["D, between, after", "C, between, before", "A, after, after", "B, before, before"], answer: 0,
+              explain: "Before E is D. C sits between B and D. B is just after A." }
+          ]
+        }
+      ]
+    },
+    {
+      id: "addition", label: "Addition", emoji: "➕",
+      sections: [
+        {
+          id: "reasoning", label: "Mathematical Reasoning", emoji: "🧠",
+          questions: [
+            { q: "How many birds are there in both nests altogether?",
+              visual: SET([{ e: "🐤", n: 8, t: "Nest P", base: "🪺" }, { e: "🐤", n: 6, t: "Nest Q", base: "🪺" }]),
+              options: ["8 + 5 = 13", "7 + 5 = 12", "8 + 6 = 14", "7 + 4 = 11"], answer: 2,
+              explain: "Nest P has 8 birds and nest Q has 6 birds. 8 + 6 = 14." },
+            { q: "Find the missing value.",
+              visual: EQ("43 + 42 = ?"),
+              options: ["80", "81", "82", "85"], answer: 3,
+              explain: "43 + 42 = 85." },
+            { q: "Which addition do the abacuses show?",
+              visual: '<span class="ab-sum">' + A(5, 4) + '<span class="ab-op">+</span>' + A(3, 1) + '<span class="ab-op">=</span>' + A(8, 5) + "</span>",
+              options: ["53 + 32 = 85", "54 + 31 = 85", "51 + 33 = 84", "50 + 4 = 54"], answer: 1,
+              explain: "The abacuses show 54 and 31. 54 + 31 = 85." },
+            { q: "A frog jumps 2 steps from 0, then 4 more steps. Which number does it reach?",
+              visual: NL(8, [[0, 2], [2, 6]]),
+              options: ["5", "6", "7", "4"], answer: 1,
+              explain: "2 steps and then 4 steps: 2 + 4 = 6." },
+            { q: "Which abacus shows the sum 32 + 3?",
+              visual: EQ("32 + 3 = ?"),
+              options: [A(3, 2), A(3, 5), A(3, 3), A(2, 5)], optHtml: true, answer: 1,
+              explain: "32 + 3 = 35, which is 3 tens and 5 ones." },
+            { q: "Arrange the numbers on the ducks from smallest to greatest.",
+              visual: CH([{ e: "🦆", n: 25, t: "P" }, { e: "🦆", n: 28, t: "Q" }, { e: "🦆", n: 29, t: "R" }, { e: "🦆", n: 27, t: "S" }]),
+              options: ["P, S, Q, R", "S, R, Q, P", "Q, S, R, P", "R, Q, S, P"], answer: 0,
+              explain: "P is 25, S is 27, Q is 28, R is 29. Smallest to greatest: P, S, Q, R." },
+            { q: "Tanush adds two numbers and gets 54. What is he adding?",
+              options: ["50 ones + 4 tens", "5 ones + 4 ones", "5 tens + 4 ones", "4 tens + 5 ones"], answer: 2,
+              explain: "54 is 5 tens and 4 ones. So 5 tens + 4 ones = 54." },
+            { q: "When 0 is added to 87, what is the sum?",
+              visual: EQ("87 + 0 = ?"),
+              options: ["76", "78", "87", "70"], answer: 2,
+              explain: "Adding zero does not change a number. 87 + 0 = 87." },
+            { q: "What is the sum of the smallest and the greatest number on the cloud?",
+              visual: GROUP("☁️", [20, 52, 43, 13, 24, 31]),
+              options: ["62", "67", "69", "65"], answer: 3,
+              explain: "The smallest is 13 and the greatest is 52. 13 + 52 = 65." },
+            { q: "Find the missing number.",
+              visual: EQ("▢ + 12 = 23"),
+              options: ["8", "9", "10", "11"], answer: 3,
+              explain: "23 − 12 = 11, so the missing number is 11." },
+            { q: "Which addition gives an answer more than 27 but less than 40?",
+              options: ["23 + 26", "13 + 41", "24 + 15", "14 + 11"], answer: 2,
+              explain: "24 + 15 = 39, which is more than 27 and less than 40." },
+            { q: "What is the sum of 24 and 15?",
+              visual: EQ("24 + 15 = ?"),
+              options: ["Twenty nine", "Thirty five", "Thirty nine", "Twenty four"], answer: 2,
+              explain: "24 + 15 = 39 — thirty nine." },
+            { q: "Find the total number of fish in bowls P and Q.",
+              visual: SET([{ e: "🐠", n: 6, t: "Bowl P", base: "🥣" }, { e: "🐠", n: 7, t: "Bowl Q", base: "🥣" }]),
+              options: ["11", "17", "13", "15"], answer: 2,
+              explain: "Bowl P has 6 fish and bowl Q has 7 fish. 6 + 7 = 13." },
+            { q: "Find the total number of fish in bowls P, Q and R.",
+              visual: SET([{ e: "🐠", n: 6, t: "Bowl P", base: "🥣" }, { e: "🐠", n: 7, t: "Bowl Q", base: "🥣" }, { e: "🐠", n: 5, t: "Bowl R", base: "🥣" }]),
+              options: ["14", "16", "18", "20"], answer: 2,
+              explain: "6 + 7 + 5 = 18 fish altogether." },
+            { q: "Find the value of P.",
+              visual: VSUM(),
+              options: ["3", "4", "5", "6"], answer: 2,
+              explain: "15 + 53 = 68, so P must be 5." }
+          ]
+        },
+        {
+          id: "everyday", label: "Everyday Maths", emoji: "🛒",
+          questions: [
+            { q: "There are 4 apples, 3 mangoes and 10 cherries in a basket. How many fruits are there altogether?",
+              visual: ROW("🍎", 4) + ROW("🥭", 3) + ROW("🍒", 10),
+              options: ["14", "15", "16", "17"], answer: 3,
+              explain: "4 + 3 + 10 = 17 fruits." },
+            { q: "Dhir has 31 pens. He buys 7 more pens. How many pens does he have altogether?",
+              visual: CH([{ e: "🖊️", n: 31, t: "has" }, { e: "🖊️", n: 7, t: "buys more" }]),
+              options: ["25", "38", "22", "39"], answer: 1,
+              explain: "31 + 7 = 38 pens." },
+            { q: "There are 32 ducks and 23 swans in a pond. How many ducks and swans are there altogether?",
+              visual: CH([{ e: "🦆", n: 32, t: "ducks" }, { e: "🦢", n: 23, t: "swans" }]),
+              options: ["55", "45", "52", "58"], answer: 0,
+              explain: "32 + 23 = 55." },
+            { q: "There are 6 snails and 4 caterpillars on a tree. How many are on the tree altogether?",
+              visual: ROW("🐌", 6) + ROW("🐛", 4),
+              options: ["13", "11", "8", "10"], answer: 3,
+              explain: "6 + 4 = 10 altogether." },
+            { q: "Priya has 14 animal stickers, 12 bird stickers and 32 flower stickers. How many stickers does she have altogether?",
+              visual: CH([{ e: "🐾", n: 14, t: "animal" }, { e: "🐦", n: 12, t: "bird" }, { e: "🌸", n: 32, t: "flower" }]),
+              options: ["48", "44", "46", "58"], answer: 3,
+              explain: "14 + 12 + 32 = 58 stickers." }
+          ]
+        },
+        {
+          id: "achievers", label: "Achievers Section", emoji: "🏆",
+          questions: [
+            { q: "Vidhi, Rinu and Nidhi each have 5 dolls. How many dolls do they have altogether?",
+              visual: ROW("🪆", 5) + ROW("🪆", 5) + ROW("🪆", 5),
+              options: ["20", "15", "10", "25"], answer: 1,
+              explain: "5 + 5 + 5 = 15 dolls." },
+            { q: "Which addition is correct?",
+              options: ["74 + 12 = 80", "35 + 62 = 89", "53 + 22 = 75", "26 + 43 = 72"], answer: 2,
+              explain: "53 + 22 = 75 is correct. The others do not add up." },
+            { q: "'4 more than 5' is shown by which number line?",
+              options: [NL(10, [[5, 9]]), NL(10, [[0, 4]]), NL(10, [[4, 9]]), NL(10, [[5, 8]])], optHtml: true, answer: 0,
+              explain: "4 more than 5 is 5 + 4 = 9. Start at 5 and jump 4 to reach 9." }
+          ]
+        }
+      ]
+    }
+  ];
+
+  /* ---- Maths DOM refs ---- */
+  var mathsChapterGrid = $("#mathsChapterGrid");
+  var mathsSectionGrid = $("#mathsSectionGrid");
+  var mathsSectionHeading = $("#mathsSectionHeading");
+  var mathsSectionSubtitle = $("#mathsSectionSubtitle");
+  var explainToggle = $("#explainToggle");
+
+  var quizQuestion = $("#quizQuestion");
+  var quizVisual   = $("#quizVisual");
+  var quizOptions  = $("#quizOptions");
+  var quizExplain  = $("#quizExplain");
+  var quizExplainText = $("#quizExplainText");
+  var quizReadBtn  = $("#quizReadBtn");
+  var speedVal     = $("#speedVal");
+  var quizSubmitBtn = $("#quizSubmitBtn");
+  var quizNextBtn  = $("#quizNextBtn");
+  var quizPrevBtn  = $("#quizPrevBtn");
+  var quizProgressLabel = $("#quizProgressLabel");
+  var quizProgressLevel = $("#quizProgressLevel");
+  var quizFill     = $("#quizFill");
+  var quizBarEl    = $("#quizBarEl");
+  var quizScore    = $("#quizScore");
+  var quizResultText = $("#quizResultText");
+  var quizResultEmoji = $("#quizResultEmoji");
+
+  /* ---- Maths state ---- */
+  var quiz = {
+    list: [], index: 0, label: "",
+    results: [],            // per-question { selected, submitted }
+    rate: NORMAL_RATE,
+    showExplain: true
+  };
+
+  /* ---- Chapter + section pickers ---- */
+  function openMathsChapters() {
+    stopQuizSpeech();
+    mathsChapterGrid.innerHTML = "";
+    MATHS.forEach(function (chap) {
+      var count = chap.sections.reduce(function (n, s) { return n + s.questions.length; }, 0);
+      var btn = document.createElement("button");
+      btn.className = "section-card section-card-featured";
+      btn.setAttribute("role", "listitem");
+      btn.innerHTML =
+        '<span class="section-num">' + chap.emoji + " " + chap.label + "</span>" +
+        '<span class="section-range">Chapter</span>' +
+        '<span class="section-meta">' + count + " questions</span>";
+      btn.addEventListener("click", function () { openMathsSections(chap); });
+      mathsChapterGrid.appendChild(btn);
+    });
+    showScreen(mathsChapterScreen);
+  }
+
+  function openMathsSections(chap) {
+    stopQuizSpeech();
+    mathsSectionHeading.textContent = chap.emoji + " " + chap.label;
+    mathsSectionSubtitle.textContent = "Choose a part, then start.";
+    mathsSectionGrid.innerHTML = "";
+
+    chap.sections.forEach(function (sec) {
+      var btn = document.createElement("button");
+      btn.className = "section-card";
+      btn.setAttribute("role", "listitem");
+      btn.innerHTML =
+        '<span class="section-num">' + sec.emoji + " " + sec.label + "</span>" +
+        '<span class="section-range">Practice</span>' +
+        '<span class="section-meta">' + sec.questions.length + " questions</span>";
+      btn.addEventListener("click", function () {
+        startQuiz(sec.questions, chap.label + " · " + sec.label);
+      });
+      mathsSectionGrid.appendChild(btn);
+    });
+
+    // "Whole chapter" card
+    var all = [];
+    chap.sections.forEach(function (s) { all = all.concat(s.questions); });
+    var allBtn = document.createElement("button");
+    allBtn.className = "section-card section-card-featured";
+    allBtn.setAttribute("role", "listitem");
+    allBtn.innerHTML =
+      '<span class="section-num">📚 Whole chapter</span>' +
+      '<span class="section-range">All sections</span>' +
+      '<span class="section-meta">' + all.length + " questions</span>";
+    allBtn.addEventListener("click", function () {
+      startQuiz(all, chap.label + " · Whole chapter");
+    });
+    mathsSectionGrid.appendChild(allBtn);
+
+    showScreen(mathsSectionScreen);
+  }
+
+  /* ---- Running a quiz ---- */
+  function startQuiz(questions, label) {
+    quiz.list = questions.slice();
+    quiz.index = 0;
+    quiz.label = label;
+    quiz.results = [];
+    quiz.showExplain = explainToggle.getAttribute("aria-checked") === "true";
+    showScreen(quizScreen);
+    renderQuestion();
+  }
+
+  function buildWordSpans(container, text) {
+    container.innerHTML = "";
+    var re = /[^\s]+/g, last = 0, m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > last) container.appendChild(document.createTextNode(text.slice(last, m.index)));
+      var span = document.createElement("span");
+      span.className = "q-word";
+      span.dataset.start = String(m.index);
+      span.textContent = m[0];
+      container.appendChild(span);
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) container.appendChild(document.createTextNode(text.slice(last)));
+  }
+
+  function renderQuestion() {
+    stopQuizSpeech();
+    var item = quiz.list[quiz.index];
+    if (!item) return;
+    var res = quiz.results[quiz.index];
+
+    buildWordSpans(quizQuestion, item.q);
+    quizVisual.innerHTML = item.visual || "";
+    quizVisual.style.display = item.visual ? "" : "none";
+
+    // Options
+    quizOptions.innerHTML = "";
+    quizOptions.classList.remove("locked");
+    var letters = ["A", "B", "C", "D", "E", "F"];
+    item.options.forEach(function (opt, i) {
+      var b = document.createElement("button");
+      b.className = "quiz-option";
+      b.setAttribute("role", "radio");
+      b.setAttribute("aria-checked", "false");
+      var body = '<span class="opt-letter">' + letters[i] + "</span>" +
+                 '<span class="opt-body">' + (item.optHtml ? opt : escapeHtml(opt)) + "</span>";
+      b.innerHTML = body;
+      b.addEventListener("click", function () { selectOption(i); });
+      quizOptions.appendChild(b);
+    });
+
+    // Restore any previous answer for this question
+    if (res) {
+      markSelected(res.selected);
+      if (res.submitted) revealAnswer();
+    }
+
+    // Explanation
+    quizExplain.hidden = true;
+
+    // Actions
+    var submitted = res && res.submitted;
+    quizSubmitBtn.hidden = submitted;
+    quizSubmitBtn.disabled = !(res && res.selected >= 0);
+    quizNextBtn.hidden = !submitted;
+    quizNextBtn.innerHTML = (quiz.index === quiz.list.length - 1)
+      ? 'See score <span aria-hidden="true">▶</span>'
+      : 'Next <span aria-hidden="true">▶</span>';
+    quizPrevBtn.disabled = quiz.index === 0;
+
+    // Progress
+    var total = quiz.list.length, pos = quiz.index + 1;
+    var pct = total ? Math.round((pos / total) * 100) : 0;
+    quizProgressLabel.textContent = "Question " + pos + " of " + total;
+    quizProgressLevel.textContent = quiz.label;
+    quizFill.style.width = pct + "%";
+    quizBarEl.setAttribute("aria-valuenow", String(pct));
+
+    updateSpeedLabel();
+
+    // Read the question aloud on arrival (the point of the app).
+    setTimeout(function () {
+      if (!quizScreen.hidden) speakQuestion();
+    }, 320);
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function optionButtons() {
+    return Array.prototype.slice.call(quizOptions.querySelectorAll(".quiz-option"));
+  }
+
+  function markSelected(i) {
+    optionButtons().forEach(function (b, idx) {
+      var on = idx === i;
+      b.classList.toggle("selected", on);
+      b.setAttribute("aria-checked", on ? "true" : "false");
+    });
+  }
+
+  function selectOption(i) {
+    var res = quiz.results[quiz.index];
+    if (res && res.submitted) return;         // locked after submit
+    quiz.results[quiz.index] = { selected: i, submitted: false };
+    markSelected(i);
+    quizSubmitBtn.disabled = false;
+  }
+
+  function revealAnswer() {
+    var item = quiz.list[quiz.index];
+    var res = quiz.results[quiz.index];
+    quizOptions.classList.add("locked");
+    optionButtons().forEach(function (b, idx) {
+      if (idx === item.answer) b.classList.add("correct");
+      else if (idx === res.selected) b.classList.add("wrong");
+    });
+    if (quiz.showExplain) {
+      quizExplainText.textContent = item.explain;
+      quizExplain.hidden = false;
+    }
+  }
+
+  function submitAnswer() {
+    var res = quiz.results[quiz.index];
+    if (!res || res.selected < 0 || res.submitted) return;
+    res.submitted = true;
+    revealAnswer();
+    quizSubmitBtn.hidden = true;
+    quizNextBtn.hidden = false;
+    var item = quiz.list[quiz.index];
+    if (res.selected === item.answer) {
+      spawnConfetti(30);
+      announce("Correct!");
+    } else {
+      announce("Not quite. The correct answer is " + item.options[item.answer]);
+    }
+  }
+
+  function quizNext() {
+    if (quiz.index < quiz.list.length - 1) { quiz.index++; renderQuestion(); }
+    else finishQuiz();
+  }
+  function quizPrev() {
+    if (quiz.index > 0) { quiz.index--; renderQuestion(); }
+  }
+
+  function finishQuiz() {
+    stopQuizSpeech();
+    var total = quiz.list.length, correct = 0;
+    quiz.results.forEach(function (r, i) {
+      if (r && r.submitted && quiz.list[i] && r.selected === quiz.list[i].answer) correct++;
+    });
+    quizScore.textContent = correct + " out of " + total + " correct";
+    var pct = total ? correct / total : 0;
+    if (pct === 1) { quizResultEmoji.textContent = "🏆"; quizResultText.textContent = "Perfect score! Amazing work!"; }
+    else if (pct >= 0.7) { quizResultEmoji.textContent = "🎉"; quizResultText.textContent = "Great job! Keep it up!"; }
+    else if (pct >= 0.4) { quizResultEmoji.textContent = "🌟"; quizResultText.textContent = "Good try! Practice makes perfect."; }
+    else { quizResultEmoji.textContent = "🌱"; quizResultText.textContent = "Nice effort! Let's try again."; }
+    showScreen(quizResultScreen);
+    if (pct >= 0.7) bigCelebrate();
+  }
+
+  /* ---- Read the question aloud, underlining each word ---- */
+  var quizTimers = [];
+  function clearQuizTimers() { quizTimers.forEach(clearTimeout); quizTimers = []; }
+  function clearQuizReading() {
+    quizQuestion.querySelectorAll(".q-word.reading-word")
+      .forEach(function (s) { s.classList.remove("reading-word"); });
+  }
+  function stopQuizSpeech() {
+    if (synth && synth.speaking) synth.cancel();
+    clearQuizTimers();
+    clearQuizReading();
+    if (quizReadBtn) quizReadBtn.classList.remove("speaking");
+  }
+
+  function speakQuestion() {
+    var item = quiz.list[quiz.index];
+    if (!item) return;
+    if (!synth) { warnNoSpeech(); return; }
+    synth.cancel();
+    clearQuizReading();
+    clearQuizTimers();
+
+    var text = quizQuestion.textContent;
+    var spans = Array.prototype.slice.call(quizQuestion.querySelectorAll(".q-word"));
+    var total = text.length || 1;
+
+    var u = new SpeechSynthesisUtterance(text);
+    var v = pickVoice();
+    if (v) u.voice = v;
+    u.lang = (v && v.lang) || "en-US";
+    u.rate = quiz.rate;
+    u.pitch = 1.05;
+    quizReadBtn.classList.add("speaking");
+
+    var usedBoundary = false;
+    u.onboundary = function (e) {
+      if (e.name && e.name !== "word") return;
+      usedBoundary = true;
+      clearQuizTimers();
+      var idx = e.charIndex, target = null;
+      for (var i = 0; i < spans.length; i++) {
+        var st = +spans[i].dataset.start, en = st + spans[i].textContent.length;
+        if (idx >= st && idx < en) { target = spans[i]; break; }
+        if (st <= idx) target = spans[i];
+      }
+      clearQuizReading();
+      if (target) target.classList.add("reading-word");
+    };
+    u.onstart = function () {
+      if (usedBoundary) return;
+      var msPerChar = 68 / (u.rate || 1);
+      var totalMs = Math.max(700, total * msPerChar);
+      spans.forEach(function (sp) {
+        var frac = (+sp.dataset.start) / total;
+        var t = setTimeout(function () {
+          if (!usedBoundary) { clearQuizReading(); sp.classList.add("reading-word"); }
+        }, Math.round(frac * totalMs));
+        quizTimers.push(t);
+      });
+    };
+    u.onend = u.onerror = function () {
+      clearQuizTimers();
+      clearQuizReading();
+      quizReadBtn.classList.remove("speaking");
+    };
+    synth.speak(u);
+  }
+
+  function updateSpeedLabel() {
+    var mult = Math.round((quiz.rate / NORMAL_RATE) * 10) / 10;
+    speedVal.textContent = mult.toFixed(1) + "×";
+  }
+  function changeRate(delta) {
+    quiz.rate = Math.min(1.3, Math.max(0.55, Math.round((quiz.rate + delta) * 100) / 100));
+    updateSpeedLabel();
+    speakQuestion();
+  }
+
+  /* ---- Maths event wiring ---- */
+  explainToggle.addEventListener("click", function () {
+    var on = explainToggle.getAttribute("aria-checked") !== "true";
+    explainToggle.setAttribute("aria-checked", on ? "true" : "false");
+    explainToggle.classList.toggle("on", on);
+  });
+  quizReadBtn.addEventListener("click", speakQuestion);
+  $("#speedDownBtn").addEventListener("click", function () { changeRate(-0.15); });
+  $("#speedUpBtn").addEventListener("click", function () { changeRate(0.15); });
+  quizSubmitBtn.addEventListener("click", submitAnswer);
+  quizNextBtn.addEventListener("click", quizNext);
+  quizPrevBtn.addEventListener("click", quizPrev);
+  $("#quizAgainBtn").addEventListener("click", function () {
+    quiz.index = 0; quiz.results = [];
+    showScreen(quizScreen); renderQuestion();
+  });
+  $("#quizHomeBtn").addEventListener("click", function () {
+    stopQuizSpeech(); showScreen(chooseScreen);
+  });
+
+  /* ==========================================================
+     17. Init
      ========================================================== */
   initTheme();
   updateOverall();
-  showScreen(homeScreen);
+  showScreen(chooseScreen);
 
 })();

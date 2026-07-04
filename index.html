@@ -48,7 +48,7 @@
 
     <h1 class="brand">
       <span class="brand-star" aria-hidden="true">★</span>
-      SightWord Journey
+      Learn &amp; Play
     </h1>
 
     <button class="theme-btn" id="themeBtn" aria-label="Switch between light and dark mode">
@@ -57,8 +57,27 @@
   </header>
 
   <main id="main">
+    <!-- ===================== CHOOSER SCREEN ===================== -->
+    <section id="chooseScreen" class="screen active" aria-labelledby="chooseHeading">
+      <h2 id="chooseHeading" class="screen-title">What shall we do?</h2>
+      <p class="screen-subtitle">Pick an activity to begin.</p>
+
+      <div class="choose-grid" role="list">
+        <button class="choose-card choose-words" id="chooseWordsBtn" role="listitem">
+          <span class="choose-emoji" aria-hidden="true">📖</span>
+          <span class="choose-name">Sight Words</span>
+          <span class="choose-desc">Read &amp; listen to words</span>
+        </button>
+        <button class="choose-card choose-maths" id="chooseMathsBtn" role="listitem">
+          <span class="choose-emoji" aria-hidden="true">➕</span>
+          <span class="choose-name">Maths Test</span>
+          <span class="choose-desc">Answer fun questions</span>
+        </button>
+      </div>
+    </section>
+
     <!-- ===================== HOME SCREEN ===================== -->
-    <section id="homeScreen" class="screen active" aria-labelledby="homeHeading">
+    <section id="homeScreen" class="screen" aria-labelledby="homeHeading">
       <h2 id="homeHeading" class="screen-title">Pick your level</h2>
       <p class="screen-subtitle">Tap a card to start learning!</p>
 
@@ -170,6 +189,101 @@
           </button>
           <button class="btn btn-nav btn-next" id="nextBtn" aria-label="Next word">
             Next <span aria-hidden="true">▶</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== MATHS: CHAPTER PICKER ===================== -->
+    <section id="mathsChapterScreen" class="screen" aria-labelledby="mathsChapterHeading" hidden>
+      <h2 id="mathsChapterHeading" class="screen-title">Maths Test</h2>
+      <p class="screen-subtitle">Pick a chapter to practice.</p>
+      <div class="section-grid" id="mathsChapterGrid" role="list"></div>
+    </section>
+
+    <!-- ===================== MATHS: SECTION PICKER + SETTINGS ===================== -->
+    <section id="mathsSectionScreen" class="screen" aria-labelledby="mathsSectionHeading" hidden>
+      <h2 id="mathsSectionHeading" class="screen-title">Chapter</h2>
+      <p id="mathsSectionSubtitle" class="screen-subtitle">Choose a part, then start.</p>
+
+      <div class="quiz-settings">
+        <div class="quiz-setting-row">
+          <div class="quiz-setting-text">
+            <span class="quiz-setting-title">Show explanations</span>
+            <span class="quiz-setting-hint">See why an answer is right, after you submit.</span>
+          </div>
+          <button class="toggle" id="explainToggle" role="switch" aria-checked="true" aria-label="Show explanations">
+            <span class="toggle-knob" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="section-grid" id="mathsSectionGrid" role="list"></div>
+    </section>
+
+    <!-- ===================== MATHS: QUIZ SCREEN ===================== -->
+    <section id="quizScreen" class="screen" aria-labelledby="quizHeading" hidden>
+      <h2 id="quizHeading" class="visually-hidden">Maths question</h2>
+
+      <div class="progress-wrap">
+        <div class="progress-info">
+          <span class="progress-label" id="quizProgressLabel">Question 1 of 1</span>
+          <span class="progress-level" id="quizProgressLevel"></span>
+        </div>
+        <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="quizBarEl">
+          <div class="progress-fill" id="quizFill"></div>
+        </div>
+      </div>
+
+      <div class="quiz-card">
+        <p class="quiz-question" id="quizQuestion"></p>
+        <div class="quiz-visual" id="quizVisual" aria-hidden="true"></div>
+
+        <div class="quiz-readbar">
+          <button class="btn btn-listen btn-read" id="quizReadBtn">
+            <span class="btn-icon" aria-hidden="true">🔊</span> Read
+          </button>
+          <div class="speed-ctrl" aria-label="Reading speed">
+            <button class="speed-btn" id="speedDownBtn" aria-label="Slower">−</button>
+            <span class="speed-val" id="speedVal">1.0×</span>
+            <button class="speed-btn" id="speedUpBtn" aria-label="Faster">+</button>
+          </div>
+        </div>
+
+        <div class="quiz-options" id="quizOptions" role="radiogroup" aria-label="Answer options"></div>
+
+        <div class="quiz-explain" id="quizExplain" hidden>
+          <span class="quiz-explain-label"><span aria-hidden="true">💡</span> Why</span>
+          <p id="quizExplainText"></p>
+        </div>
+
+        <div class="quiz-actions">
+          <button class="btn btn-nav btn-prev" id="quizPrevBtn" aria-label="Previous question">
+            <span aria-hidden="true">◀</span> Back
+          </button>
+          <button class="btn btn-know btn-submit" id="quizSubmitBtn" disabled>
+            Submit
+          </button>
+          <button class="btn btn-nav btn-next" id="quizNextBtn" aria-label="Next question" hidden>
+            Next <span aria-hidden="true">▶</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== MATHS: RESULT SCREEN ===================== -->
+    <section id="quizResultScreen" class="screen" aria-labelledby="quizResultHeading" hidden>
+      <div class="finish-card">
+        <div class="finish-emoji" id="quizResultEmoji" aria-hidden="true">🎉</div>
+        <h2 id="quizResultHeading" class="screen-title">All done!</h2>
+        <p class="quiz-score" id="quizScore"></p>
+        <p class="finish-text" id="quizResultText"></p>
+        <div class="finish-actions">
+          <button class="btn btn-know" id="quizAgainBtn">
+            <span aria-hidden="true">🔁</span> Try Again
+          </button>
+          <button class="btn btn-nav" id="quizHomeBtn">
+            <span aria-hidden="true">🏠</span> Home
           </button>
         </div>
       </div>
