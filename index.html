@@ -142,32 +142,36 @@
         </div>
       </div>
 
-      <!-- Sound controls -->
-      <div class="sound-row">
-        <button class="btn btn-listen" id="listenBtn">
-          <span class="btn-icon" aria-hidden="true">🔊</span> Listen
-        </button>
-        <button class="btn btn-slow" id="slowBtn">
-          <span class="btn-icon" aria-hidden="true">🐢</span> Slow
-        </button>
-        <button class="btn btn-phonics" id="phonicsBtn">
-          <span class="btn-icon" aria-hidden="true">🔤</span> Sound It Out
-        </button>
-      </div>
+      <!-- Controls: transparent in portrait (display:contents), becomes the
+           right-hand column in landscape so everything fits without scrolling. -->
+      <div class="learn-controls">
+        <!-- Sound controls -->
+        <div class="sound-row">
+          <button class="btn btn-listen" id="listenBtn">
+            <span class="btn-icon" aria-hidden="true">🔊</span> Listen
+          </button>
+          <button class="btn btn-slow" id="slowBtn">
+            <span class="btn-icon" aria-hidden="true">🐢</span> Slow
+          </button>
+          <button class="btn btn-phonics" id="phonicsBtn">
+            <span class="btn-icon" aria-hidden="true">🔤</span> Sound It Out
+          </button>
+        </div>
 
-      <!-- Know-it -->
-      <button class="btn btn-know" id="knowBtn">
-        <span class="btn-icon" aria-hidden="true">⭐</span> I Know This!
-      </button>
+        <!-- Know-it -->
+        <button class="btn btn-know" id="knowBtn">
+          <span class="btn-icon" aria-hidden="true">⭐</span> I Know This!
+        </button>
 
-      <!-- Navigation -->
-      <div class="nav-row">
-        <button class="btn btn-nav btn-prev" id="prevBtn" aria-label="Previous word">
-          <span aria-hidden="true">◀</span> Back
-        </button>
-        <button class="btn btn-nav btn-next" id="nextBtn" aria-label="Next word">
-          Next <span aria-hidden="true">▶</span>
-        </button>
+        <!-- Navigation -->
+        <div class="nav-row">
+          <button class="btn btn-nav btn-prev" id="prevBtn" aria-label="Previous word">
+            <span aria-hidden="true">◀</span> Back
+          </button>
+          <button class="btn btn-nav btn-next" id="nextBtn" aria-label="Next word">
+            Next <span aria-hidden="true">▶</span>
+          </button>
+        </div>
       </div>
     </section>
 
