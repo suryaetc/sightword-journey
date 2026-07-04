@@ -354,8 +354,8 @@
     slow: false        // slow-speech toggle
   };
 
-  const SLOW_RATE = 0.55;
-  const NORMAL_RATE = 0.85;
+  const SLOW_RATE = 0.7;    // "Slow" button + sounding out (still clearly slow)
+  const NORMAL_RATE = 0.95; // Listen / Say sentence (near-natural pace)
 
   /* ==========================================================
      3. localStorage progress  (mastery per word)

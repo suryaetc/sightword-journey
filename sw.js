@@ -4,7 +4,7 @@
    Note: service workers only run over http(s), not file://.
    ============================================================ */
 
-const CACHE = "sightword-journey-v9";
+const CACHE = "sightword-journey-v10";
 const ASSETS = [
   "./",
   "./index.html",
