@@ -600,19 +600,27 @@
   function renderSentence(item) {
     wordSentence.innerHTML = "";
     if (!item.s) return;
-    // Highlight the target word (case-insensitive, whole-ish word)
-    const re = new RegExp("(" + item.w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "i");
-    const parts = item.s.split(re);
-    parts.forEach(function (chunk) {
-      if (chunk.toLowerCase() === item.w.toLowerCase()) {
-        const b = document.createElement("span");
-        b.className = "hl";
-        b.textContent = chunk;
-        wordSentence.appendChild(b);
-      } else {
-        wordSentence.appendChild(document.createTextNode(chunk));
+    // Wrap EACH word in its own span, recording its character offset in the
+    // sentence. The offset lets us light up the matching word during speech
+    // (via SpeechSynthesis onboundary). The target word keeps its coral tint.
+    const s = item.s;
+    const wordRe = /[A-Za-z']+/g;
+    let last = 0, m;
+    while ((m = wordRe.exec(s)) !== null) {
+      if (m.index > last) {
+        wordSentence.appendChild(document.createTextNode(s.slice(last, m.index)));
       }
-    });
+      const span = document.createElement("span");
+      span.className = "sentence-word";
+      if (m[0].toLowerCase() === item.w.toLowerCase()) span.classList.add("hl");
+      span.dataset.start = String(m.index);
+      span.textContent = m[0];
+      wordSentence.appendChild(span);
+      last = m.index + m[0].length;
+    }
+    if (last < s.length) {
+      wordSentence.appendChild(document.createTextNode(s.slice(last)));
+    }
   }
 
   function renderStars(count) {
@@ -711,8 +719,10 @@
   function cancelSpeech() {
     if (synth && synth.speaking) synth.cancel();
     clearHighlights();
+    clearSentenceHighlight();
     listenBtn.classList.remove("speaking");
     phonicsBtn.classList.remove("speaking");
+    saySentenceBtn.classList.remove("speaking");
   }
 
   function speakWord(text, forceSlow) {
@@ -730,13 +740,25 @@
     synth.speak(u);
   }
 
-  // Speak the whole example sentence for the current word.
+  // Remove the karaoke highlight from every sentence word.
+  function clearSentenceHighlight() {
+    wordSentence.querySelectorAll(".sentence-word.speaking-word")
+      .forEach(function (s) { s.classList.remove("speaking-word"); });
+  }
+
+  // Speak the whole example sentence, highlighting each word as it is read.
   function speakSentence() {
     const item = current();
     if (!item || !item.s) return;
     if (!synth) { warnNoSpeech(); return; }
     synth.cancel();
     clearHighlights();
+    clearSentenceHighlight();
+
+    const spans = Array.prototype.slice.call(
+      wordSentence.querySelectorAll(".sentence-word")
+    );
+
     const u = new SpeechSynthesisUtterance(item.s);
     const v = pickVoice();
     if (v) u.voice = v;
@@ -744,7 +766,28 @@
     u.rate = state.slow ? SLOW_RATE : NORMAL_RATE;
     u.pitch = 1.05;
     saySentenceBtn.classList.add("speaking");
-    u.onend = u.onerror = function () { saySentenceBtn.classList.remove("speaking"); };
+
+    // Light up the word at each spoken boundary (karaoke style).
+    // Not every TTS engine emits word boundaries; if none fire, the audio
+    // still plays and we simply skip the highlight (graceful fallback).
+    u.onboundary = function (e) {
+      if (e.name && e.name !== "word") return;
+      const idx = e.charIndex;
+      let target = null;
+      for (let i = 0; i < spans.length; i++) {
+        const start = +spans[i].dataset.start;
+        const end = start + spans[i].textContent.length;
+        if (idx >= start && idx < end) { target = spans[i]; break; }
+        if (start <= idx) target = spans[i]; // fallback: last word started
+      }
+      clearSentenceHighlight();
+      if (target) target.classList.add("speaking-word");
+    };
+
+    u.onend = u.onerror = function () {
+      saySentenceBtn.classList.remove("speaking");
+      clearSentenceHighlight();
+    };
     synth.speak(u);
   }
 

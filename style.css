@@ -400,6 +400,18 @@ main {
 }
 .word-sentence .hl { color: var(--coral-deep); font-style: normal; font-weight: 800; }
 
+/* Karaoke-style highlight: the word currently being spoken lights up. */
+.word-sentence .sentence-word {
+  border-radius: 7px;
+  padding: 0 3px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.word-sentence .sentence-word.speaking-word {
+  background: var(--gold);
+  color: var(--ink);
+  box-shadow: 0 0 0 2px var(--gold);
+}
+
 /* "Say sentence" button under the example sentence */
 .btn-say-sentence {
   margin: 14px auto 0;
