@@ -4,7 +4,7 @@
    Note: service workers only run over http(s), not file://.
    ============================================================ */
 
-const CACHE = "sightword-journey-v8";
+const CACHE = "sightword-journey-v9";
 const ASSETS = [
   "./",
   "./index.html",
@@ -13,7 +13,8 @@ const ASSETS = [
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
-  "./apple-touch-icon.png"
+  "./apple-touch-icon.png",
+  "./Baloo2.ttf"
 ];
 
 // Install: pre-cache the app shell.

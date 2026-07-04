@@ -3,6 +3,16 @@
    Muted, calm palette with fun accents. Mobile-first.
    ============================================================ */
 
+/* Self-hosted app font (rounded, friendly) — one variable file
+   covers all weights, works offline, matches the app icon. */
+@font-face {
+  font-family: "Baloo 2";
+  src: url("Baloo2.ttf") format("truetype");
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ---------- Theme tokens (light / default) ---------- */
 :root {
   --sage:      #a7c4a0;   /* soft sage green */
