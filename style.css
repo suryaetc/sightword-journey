@@ -813,6 +813,7 @@ main {
 .mchip em { font-style: normal; font-size: 0.72rem; color: var(--ink-soft); font-weight: 800; }
 
 .erow { display: block; font-size: 1.6rem; line-height: 1.5; letter-spacing: 2px; }
+.eq-total { display: block; margin-top: 2px; font-size: 1.35rem; color: var(--ink); }
 .meq { display: inline-block; font-size: clamp(1.5rem, 7vw, 2.1rem); font-weight: 800; color: var(--ink); letter-spacing: 1px; }
 
 .vsum {
@@ -853,3 +854,90 @@ main {
 .cset-bar { width: 66px; height: 8px; border-radius: 6px; background: #b07a4b; }
 .cset-base { font-size: 1.7rem; margin-top: -2px; }
 .cset-label { font-weight: 800; color: var(--ink-soft); font-size: 0.85rem; }
+
+/* ---------- Landscape: fit the whole quiz screen, no scrolling ----------
+   Same idea as the learning screen: on a wide + short viewport (tablet in
+   landscape) put the question / picture / read controls in a left column and
+   the answer options in a right column, so a child never has to scroll down
+   to reach the options or the Submit button. Portrait is untouched. */
+@media (orientation: landscape) and (min-width: 640px) {
+  /* Centre the question block vertically so it isn't top-heavy on taller
+     landscape screens, while still fitting shorter ones without scrolling. */
+  #quizScreen.active {
+    display: flex; flex-direction: column; justify-content: center;
+    min-height: calc(100dvh - 92px);
+  }
+  #quizScreen .quiz-card {
+    width: 100%;
+    max-width: 1080px;
+    display: grid;
+    grid-template-columns: 1fr 1.05fr;
+    grid-template-areas:
+      "q       opts"
+      "vis     opts"
+      "read    opts"
+      "explain explain"
+      "actions actions";
+    column-gap: 26px;
+    row-gap: 4px;
+    align-items: start;
+    padding: 9px 22px 11px;
+  }
+  #quizScreen .quiz-question {
+    grid-area: q; margin: 0;
+    font-size: clamp(1.05rem, 3.2vh, 1.45rem); line-height: 1.25;
+  }
+  #quizScreen .quiz-visual  { grid-area: vis; margin: 3px 0; }
+  #quizScreen .quiz-readbar { grid-area: read; margin: 4px 0 0; }
+  /* Options fill the right column as a 2x2 grid so tall picture-answers
+     (abacus, number lines) never stack off the bottom of the screen. */
+  #quizScreen .quiz-options {
+    grid-area: opts; align-self: center;
+    grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  #quizScreen .quiz-option  { padding: 10px 13px; }
+  #quizScreen .quiz-explain { grid-area: explain; margin-top: 6px; padding: 9px 16px; }
+  #quizScreen .quiz-explain p { font-size: 0.94rem; line-height: 1.4; }
+  #quizScreen .quiz-actions { grid-area: actions; margin-top: 6px; }
+  #quizScreen .quiz-actions .btn { min-height: 44px; }
+  #quizScreen .progress-wrap { margin: 1px 0 4px; }
+
+  /* Compact picture visuals so a scene fits the shorter landscape height. */
+  #quizScreen .quiz-visual .abacus { gap: 20px; }
+  #quizScreen .quiz-visual .ab-rod { min-height: 84px; }
+  #quizScreen .cset-item { padding: 8px 10px; }
+  #quizScreen .cset-things { font-size: 1.15rem; max-width: 120px; }
+  #quizScreen .cset-base { font-size: 1.4rem; }
+  #quizScreen .ngroup-emoji { font-size: 3rem; }
+  #quizScreen .erow { font-size: 1.3rem; }
+
+  /* Compact picture answers (abacus / number line) so a 2x2 grid of them
+     still fits without scrolling. */
+  #quizScreen .quiz-option .abacus { gap: 16px; padding: 2px; }
+  #quizScreen .quiz-option .ab-rod { min-height: 66px; }
+  #quizScreen .quiz-option .ab-bead { width: 15px; height: 11px; }
+  #quizScreen .quiz-option .ab-beads { gap: 2px; margin-bottom: 16px; }
+  #quizScreen .quiz-option .ab-rod::before { bottom: 15px; }
+  #quizScreen .quiz-option .numline { max-height: 66px; }
+  #quizScreen .quiz-option .erow { font-size: 1.25rem; line-height: 1.25; }
+  #quizScreen .quiz-option .eq-total { font-size: 1.05rem; margin-top: 0; }
+
+  /* Result / finish card: compact + centred so it never scrolls in landscape. */
+  #quizResultScreen.active, #finishScreen.active {
+    display: flex; flex-direction: column; justify-content: center;
+    min-height: calc(100dvh - 92px);
+  }
+  #quizResultScreen .finish-card, #finishScreen .finish-card {
+    margin: 0 auto; padding: 22px 28px; max-width: 620px; width: 100%;
+  }
+  #quizResultScreen .finish-emoji, #finishScreen .finish-emoji {
+    font-size: clamp(2.4rem, 9vh, 3.6rem);
+  }
+  #quizResultScreen .finish-text, #finishScreen .finish-text {
+    font-size: 1.05rem; margin: 6px 0 16px;
+  }
+  #quizResultScreen .quiz-score { margin: 2px 0 4px; }
+  #quizResultScreen .finish-actions, #finishScreen .finish-actions {
+    flex-direction: row; max-width: 460px;
+  }
+}

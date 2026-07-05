@@ -1542,10 +1542,18 @@
               visual: SET([{ e: "💡", n: 6, t: "Set X" }, { e: "🍃", n: 6, t: "Set Y" }, { e: "🎈", n: 5, t: "Set Z" }]),
               options: ["Set Y has more items than set Z", "Set X has less items than set Y", "Set Z has more items than set X", "All the sets are equal"], answer: 0,
               explain: "Set Y has 6 and set Z has 5, so Y has more items than Z." },
-            { q: "A train has coaches A, B, C, D, E, F in order. Coach blank is just before E. Coach C is blank B and D. Coach B is just blank A.",
+            { q: "Look at the train of coaches A to F. Which coach is just before E? Is coach C between or after coaches B and D? And is coach B just before or after coach A?",
               visual: TRAIN(),
               options: ["D, between, after", "C, between, before", "A, after, after", "B, before, before"], answer: 0,
-              explain: "Before E is D. C sits between B and D. B is just after A." }
+              explain: "Coach D is just before E. Coach C sits between B and D. Coach B is just after A." },
+            { q: "Count the objects in each option. Select the one where the total is correct.",
+              options: [
+                ROW("🌼", 4) + ROW("🌼", 3) + '<b class="eq-total">= 8</b>',
+                ROW("🍋", 7) + ROW("🍋", 7) + '<b class="eq-total">= 14</b>',
+                ROW("🍓", 4) + ROW("🍓", 4) + '<b class="eq-total">= 10</b>',
+                ROW("🟠", 6) + ROW("🟠", 4) + '<b class="eq-total">= 11</b>'
+              ], optHtml: true, answer: 1,
+              explain: "Count and add each one. Only the lemons match: 7 + 7 = 14. The flowers make 7 (not 8), the strawberries make 8 (not 10) and the beads make 10 (not 11)." }
           ]
         }
       ]
